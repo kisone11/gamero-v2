@@ -1,0 +1,1 @@
+export { FeedSkeleton } from './FeedSkeleton'

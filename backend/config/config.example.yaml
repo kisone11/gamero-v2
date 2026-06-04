@@ -1,0 +1,122 @@
+# Gamero local development config template.
+# Copy to config.yaml for local runs. Production should use env vars/secrets.
+
+server:
+  port: 8081
+  mode: debug
+  read_timeout: 60
+  write_timeout: 60
+  max_header_bytes: 1048576
+  allow_origins: []
+
+database:
+  host: localhost
+  port: 5432
+  user: gamero
+  password: gamero123
+  dbname: gamero
+  sslmode: disable
+  timezone: Asia/Shanghai
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5
+  read_timeout: 3
+  write_timeout: 3
+
+storage:
+  provider: s3
+  endpoint: http://127.0.0.1:9000
+  region: us-east-1
+  access_key_id: gamero
+  secret_access_key: gamero123
+  bucket_name: gamero
+  base_url: http://127.0.0.1:9000/gamero
+  force_path_style: true
+
+jwt:
+  access_secret: change-me-local-access-secret
+  refresh_secret: change-me-local-refresh-secret
+  access_expire: 7200
+  refresh_expire: 604800
+
+sms:
+  provider: local
+  secret_id: ""
+  secret_key: ""
+  sdk_app_id: ""
+  sign_name: Gamero
+  template_id: ""
+  expire: 300
+  interval: 60
+
+email:
+  host: 127.0.0.1
+  port: 1025
+  username: ""
+  password: ""
+  from: Gamero <noreply@gamero.local>
+  ssl: false
+  expire: 300
+  interval: 60
+
+logger:
+  level: debug
+  format: json
+  output_path: logs/gamero.log
+  max_size: 100
+  max_backups: 30
+  max_age: 30
+  compress: true
+
+rate_limit:
+  enabled: true
+  rate: 100
+  burst: 200
+  key_prefix: "rate_limit:"
+
+mq:
+  provider: memory
+  buf_size: 1000
+  brokers:
+    - "localhost:9092"
+  group_id: "gamero"
+  topic_prefix: "gamero."
+  batch_size: 100
+  batch_timeout: 100
+  min_bytes: 1
+  max_bytes: 10485760
+  max_wait_ms: 500
+  commit_interval: 1000
+
+elasticsearch:
+  enabled: false
+  addresses:
+    - "http://localhost:9200"
+  username: ""
+  password: ""
+  index_prefix: "gamero_"
+
+feed:
+  fanout_threshold: 1000
+  max_feed_len: 500
+  heavy_fanout_workers: 10
+
+observability:
+  metrics:
+    enabled: true
+    path: "/metrics"
+  tracing:
+    enabled: false
+    service_name: "gamero"
+    sample_rate: 0.1
+    exporter: "stdout"
+    endpoint: ""

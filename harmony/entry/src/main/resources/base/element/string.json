@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "Gamero"
+    },
+    {
+      "name": "module_desc",
+      "value": "Gamero HarmonyOS module"
+    },
+    {
+      "name": "ability_desc",
+      "value": "Gamero mobile app"
+    }
+  ]
+}

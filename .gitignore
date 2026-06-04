@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+oh_modules/
+
+# Build outputs
+dist/
+build/
+.vite/
+.hvigor/
+*.hap
+*.app
+
+# Runtime data and generated binaries
+backend/.runtime/
+backend/logs/
+backend/*.exe
+backend/*.exe~
+frontend/.vite.*.log
+
+# Local config and secrets
+backend/.env
+backend/config/config.yaml
+harmony/local.properties
+harmony/.idea/
+harmony/entry/harmony/
+harmony/**/build/
+harmony/**/*.hap
+harmony/**/*.app
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
