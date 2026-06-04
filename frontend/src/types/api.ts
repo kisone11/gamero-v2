@@ -541,6 +541,7 @@ export interface InvitationDetail {
   project_id: number
   project_name: string
   inviter_id: number
+  talent_id?: number
   inviter_nickname: string
   inviter_avatar_url?: string | null
   position: RecruitmentPosition

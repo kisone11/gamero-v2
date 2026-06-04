@@ -22,4 +22,7 @@ export const talentApi = {
 
   listMyInvitations: (page = 1, pageSize = 20) =>
     http.get<ApiResponse<PageData<InvitationDetail>>>('/invitations/mine', { params: { page, page_size: pageSize } }).then(extractData),
+
+  listProjectInvitations: (projectId: number, status = 'pending', page = 1, pageSize = 100) =>
+    http.get<ApiResponse<PageData<InvitationDetail>>>(`/projects/${projectId}/invitations`, { params: { status, page, page_size: pageSize } }).then(extractData),
 }

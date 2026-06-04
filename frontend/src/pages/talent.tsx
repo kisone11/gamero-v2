@@ -63,6 +63,20 @@ export default function TalentPage() {
     queryFn: () => projectApi.list({ page: 1, page_size: 50, owner_id: user!.id }),
     enabled: !!inviteTarget && !!user,
   })
+  const selectedProjectId = invProject ? Number(invProject) : 0
+  const { data: selectedProject } = useQuery({
+    queryKey: ['talent-invite-project-detail', selectedProjectId],
+    queryFn: () => projectApi.get(String(selectedProjectId)),
+    enabled: !!inviteTarget && selectedProjectId > 0,
+  })
+  const { data: projectInvitations } = useQuery({
+    queryKey: ['talent-invite-project-invitations', selectedProjectId],
+    queryFn: () => talentApi.listProjectInvitations(selectedProjectId),
+    enabled: !!inviteTarget && selectedProjectId > 0,
+  })
+  const targetAlreadyMember = !!inviteTarget && !!selectedProject?.members?.some((member) => member.user_id === inviteTarget.id)
+  const targetAlreadyInvited = !!inviteTarget && !!projectInvitations?.list?.some((invitation) => invitation.talent_id === inviteTarget.id && invitation.status === 'pending')
+  const inviteBlockedReason = targetAlreadyMember ? '该人才已在此项目中' : targetAlreadyInvited ? '已向该人才发送过邀请' : ''
   const inviteMut = useMutation({
     mutationFn: () => talentApi.invite({ project_id: Number(invProject), talent_id: inviteTarget!.id, position: invPosition, message: invMessage.trim() || undefined }),
     onSuccess: () => { setInvSent(true); setTimeout(() => { setInviteTarget(null); setInvSent(false); setInvProject(''); setInvMessage('') }, 2000) },
@@ -193,6 +207,9 @@ export default function TalentPage() {
                       <p className="text-[12px] text-text-muted">你还没有负责的项目，创建项目后才能邀请人才</p>
                     )}
                   </div>
+                  {inviteBlockedReason && (
+                    <p className="text-[12px] text-warning mt-1.5">{inviteBlockedReason}</p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">邀请职位</label>
@@ -208,7 +225,7 @@ export default function TalentPage() {
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setInviteTarget(null)}>取消</Button>
-                <Button loading={inviteMut.isPending} disabled={!invProject} onClick={() => inviteMut.mutate()}>发送邀请</Button>
+                <Button loading={inviteMut.isPending} disabled={!invProject || !!inviteBlockedReason} onClick={() => inviteMut.mutate()}>发送邀请</Button>
               </DialogFooter>
             </>
           )}
