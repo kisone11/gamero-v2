@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { Search, Zap, Users, Code2, Palette, ClipboardList, Music, Mail } from 'lucide-react'
 import { talentApi, type ListTalentsParams } from '@/api/talent'
+import { projectApi } from '@/api/project'
 import { useAuthStore } from '@/stores/authStore'
 import { TalentCard } from '@/components/recruit/TalentCard'
 import { Button, Pagination } from '@/components/ui'
@@ -57,14 +58,18 @@ export default function TalentPage() {
       ...(coopPreference && { coop_preference: coopPreference }),
     } as ListTalentsParams),
   })
-  const { data: myProjects } = useQuery({ queryKey: ['my-projects-for-invite'], queryFn: async () => { const { projectApi } = await import('@/api/project'); return projectApi.list({ page: 1, page_size: 50 }) }, enabled: !!inviteTarget })
+  const { data: myProjects } = useQuery({
+    queryKey: ['my-owned-projects-for-invite', user?.id],
+    queryFn: () => projectApi.list({ page: 1, page_size: 50, owner_id: user!.id }),
+    enabled: !!inviteTarget && !!user,
+  })
   const inviteMut = useMutation({
     mutationFn: () => talentApi.invite({ project_id: Number(invProject), talent_id: inviteTarget!.id, position: invPosition, message: invMessage.trim() || undefined }),
     onSuccess: () => { setInvSent(true); setTimeout(() => { setInviteTarget(null); setInvSent(false); setInvProject(''); setInvMessage('') }, 2000) },
     onError: (e: any) => toast.error(e?.message || '邀请失败'),
   })
 
-  const items = query.data?.list ?? []
+  const items = (query.data?.list ?? []).filter((item) => item.id !== user?.id)
   const pages = query.data?.pages ?? 1
 
   const skillCategories: { value: SkillCategory | ''; label: string }[] = [
@@ -179,11 +184,14 @@ export default function TalentPage() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">选择项目</label>
                   <div className="flex flex-wrap gap-2">
-                    {(myProjects as any)?.list?.map((p: any) => (
+                    {myProjects?.list?.map((p) => (
                       <button key={p.id} onClick={() => setInvProject(String(p.id))}
                         className={cn('px-3 py-2 text-[12px] font-medium rounded-lg border transition-all active:scale-95',
                           invProject === String(p.id) ? 'border-amber bg-amber/10 text-amber' : 'border-white/[0.04] text-text-muted hover:border-white/[0.08]')}>{p.name}</button>
                     ))}
+                    {myProjects && myProjects.list.length === 0 && (
+                      <p className="text-[12px] text-text-muted">你还没有负责的项目，创建项目后才能邀请人才</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">

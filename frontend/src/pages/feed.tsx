@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { MessageSquare, Gamepad2, ScrollText, TrendingUp, Users, Zap } from 'lucide-react'
 import { discoverApi, type FeedItem } from '@/api/discover'
+import { projectApi } from '@/api/project'
 import { userApi } from '@/api/user'
 import { useAuthStore } from '@/stores/authStore'
 import { Avatar } from '@/components/ui/avatar'
@@ -16,7 +18,6 @@ const QUICK_LINKS = [
   { href: '/devlogs', icon: ScrollText, label: '开发日志', desc: '记录开发过程' },
   { href: '/community', icon: MessageSquare, label: '社区讨论', desc: '交流与分享' },
   { href: '/recruit', icon: Users, label: '寻找队友', desc: '组建团队' },
-  { href: '/projects?owner=me', icon: Gamepad2, label: '我的项目', desc: '查看我创建的项目' },
 ]
 
 // ============================================================
@@ -25,6 +26,7 @@ const QUICK_LINKS = [
 
 export default function FeedPage() {
   const me = useAuthStore(s => s.user)
+  const [view, setView] = useState<'feed' | 'my-projects'>('feed')
 
   const feedQuery = useInfiniteQuery({
     queryKey: ['feed'],
@@ -50,7 +52,14 @@ export default function FeedPage() {
     staleTime: 60000,
   })
 
+  const { data: myProjects, isLoading: myProjectsLoading, isError: myProjectsError, refetch: refetchMyProjects } = useQuery({
+    queryKey: ['feed-my-projects', me?.id],
+    queryFn: () => projectApi.list({ page: 1, page_size: 50, participant_id: me!.id }),
+    enabled: !!me && view === 'my-projects',
+  })
+
   const items = feedQuery.data?.pages.flatMap(p => p.items) ?? []
+  const myProjectItems = myProjects?.list ?? []
   const isLoading = feedQuery.isLoading
 
   return (
@@ -88,6 +97,19 @@ export default function FeedPage() {
                   </div>
                 </Link>
               ))}
+              {me && (
+                <button
+                  type="button"
+                  onClick={() => setView('my-projects')}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-text-muted hover:text-text-primary hover:bg-white/[0.03] transition-colors group"
+                >
+                  <Gamepad2 className="w-4 h-4 shrink-0 group-hover:text-amber transition-colors" />
+                  <div>
+                    <p className="text-[13px] font-medium">我的项目</p>
+                    <p className="text-[11px] text-text-muted">参与和创建的项目</p>
+                  </div>
+                </button>
+              )}
             </div>
             <p className="text-[10px] text-text-muted text-center px-4">&copy; 2026 Gamero &middot; 游戏开发者社区</p>
           </div>
@@ -95,7 +117,36 @@ export default function FeedPage() {
 
         {/* Main Feed */}
         <main className="flex-1 min-w-0">
-          {isLoading ? (
+          {view === 'my-projects' ? (
+            <div className="space-y-3">
+              <div className="bg-surface-card border border-white/[0.04] rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-[16px] font-semibold text-text-primary">我的项目</h2>
+                  <p className="text-[12px] text-text-muted mt-1">只显示你参与或创建的项目</p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => setView('feed')}>返回动态</Button>
+              </div>
+              {myProjectsLoading ? (
+                <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <FeedSkeleton key={i} />)}</div>
+              ) : myProjectsError ? (
+                <div className="py-20 flex flex-col items-center justify-center text-center">
+                  <Zap className="w-7 h-7 text-text-muted mb-4" />
+                  <p className="text-[15px] font-semibold text-text-secondary mb-1">加载失败</p>
+                  <p className="text-[13px] text-text-muted mb-6">无法加载我的项目，请重试</p>
+                  <Button variant="secondary" size="sm" onClick={() => refetchMyProjects()}>重试</Button>
+                </div>
+              ) : myProjectItems.length === 0 ? (
+                <div className="py-20 flex flex-col items-center justify-center text-center">
+                  <Gamepad2 className="w-7 h-7 text-text-muted mb-4" />
+                  <p className="text-[15px] font-semibold text-text-secondary mb-1">暂无项目</p>
+                  <p className="text-[13px] text-text-muted mb-6">你还没有参与或创建项目</p>
+                  <Link to="/projects/new"><Button variant="primary" size="sm">创建项目</Button></Link>
+                </div>
+              ) : (
+                myProjectItems.map((project) => <ProjectCard key={project.id} project={project} />)
+              )}
+            </div>
+          ) : isLoading ? (
             <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <FeedSkeleton key={i} />)}</div>
           ) : feedQuery.isError && items.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">
@@ -153,7 +204,7 @@ export default function FeedPage() {
                 </h3>
                 <div className="space-y-3">
                   {(hotProjects as any).list.slice(0, 5).map((p: any) => (
-                    <Link key={p.id} to={`/p/${p.slug}`} className="flex items-center gap-3 group">
+                    <Link key={p.id} to={`/p/${p.slug || p.id}`} className="flex items-center gap-3 group">
                       <div className="w-8 h-8 rounded-lg bg-surface-deep overflow-hidden shrink-0 border border-white/[0.04]">
                         {p.cover_url ? <img src={p.cover_url} alt="" className="w-full h-full object-cover" />
                           : <div className="w-full h-full flex items-center justify-center"><Gamepad2 className="w-4 h-4 text-text-muted/30" /></div>}

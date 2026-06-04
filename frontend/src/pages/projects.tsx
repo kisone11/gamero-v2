@@ -137,7 +137,7 @@ export default function ProjectsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const user = useAuthStore((s) => s.user)
-  const ownerMe = searchParams.get('owner') === 'me'
+  const myProjects = searchParams.get('owner') === 'me'
 
   const [genre, setGenre] = useState<ProjectGenre | ''>('')
   const [status, setStatus] = useState<ProjectStatus | ''>('')
@@ -145,17 +145,17 @@ export default function ProjectsPage() {
   const [page, setPage] = useState(1)
 
   const projectsQuery = useQuery({
-    queryKey: ['projects', { genre, status, sort, page, ownerMe, userId: user?.id }],
+    queryKey: ['projects', { genre, status, sort, page, myProjects, userId: user?.id }],
     queryFn: () =>
       projectApi.list({
         page,
         page_size: 12,
         genre: genre || undefined,
         status: status || undefined,
-        owner_id: ownerMe && user ? user.id : undefined,
+        participant_id: myProjects && user ? user.id : undefined,
         sort,
       }),
-    enabled: !ownerMe || !!user,
+    enabled: !myProjects || !!user,
   })
 
   const projects = projectsQuery.data?.list ?? []
@@ -185,7 +185,7 @@ export default function ProjectsPage() {
     <div className="max-w-[1280px] mx-auto px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-[22px] font-bold text-text-primary">{ownerMe ? '我的项目' : '发现项目'}</h1>
+        <h1 className="text-[22px] font-bold text-text-primary">{myProjects ? '我的项目' : '发现项目'}</h1>
         {user && (
           <Button size="sm" onClick={() => navigate('/projects/new')}>
             <Plus className="w-3.5 h-3.5" />
@@ -258,7 +258,7 @@ export default function ProjectsPage() {
           </div>
           <p className="text-[15px] font-semibold text-text-secondary mb-1">暂无项目</p>
           <p className="text-[13px] text-text-muted mb-6">
-            {ownerMe ? '你还没有创建项目' : user ? '还没有项目，来创建第一个吧' : '登录后即可创建项目'}
+            {myProjects ? '你还没有参与或创建项目' : user ? '还没有项目，来创建第一个吧' : '登录后即可创建项目'}
           </p>
           {user ? (
             <Button variant="secondary" size="sm" onClick={() => navigate('/projects/new')}>

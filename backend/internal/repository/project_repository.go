@@ -117,13 +117,14 @@ type ProjectRepository interface {
 
 // ListProjectsParams 项目列表查询参数
 type ListProjectsParams struct {
-	Keyword string              // 关键词（匹配项目名、简介）
-	Status  model.ProjectStatus // 按状态筛选
-	Genre   model.ProjectGenre  // 按游戏类型筛选
-	OwnerID uint64              // 按创建者筛选
-	SortBy  string              // 排序字段：newest（默认）/ hottest / updated
-	Offset  int
-	Limit   int
+	Keyword       string              // 关键词（匹配项目名、简介）
+	Status        model.ProjectStatus // 按状态筛选
+	Genre         model.ProjectGenre  // 按游戏类型筛选
+	OwnerID       uint64              // 按创建者筛选
+	ParticipantID uint64              // 按参与者筛选（owner + 活跃成员）
+	SortBy        string              // 排序字段：newest（默认）/ hottest / updated
+	Offset        int
+	Limit         int
 }
 
 // ProjectFilter 高级筛选参数
@@ -229,7 +230,11 @@ func (r *projectRepository) SoftDeleteProject(ctx context.Context, id uint64) er
 
 // ListProjects 分页查询项目列表
 func (r *projectRepository) ListProjects(ctx context.Context, params *ListProjectsParams) ([]*model.Project, int64, error) {
-	query := r.db.WithContext(ctx).Model(&model.Project{}).Where("deleted_at IS NULL")
+	query := r.db.WithContext(ctx).Model(&model.Project{}).Where("projects.deleted_at IS NULL")
+	if params.ParticipantID > 0 {
+		query = query.Joins("LEFT JOIN project_members pm ON pm.project_id = projects.id AND pm.is_active = true").
+			Where("projects.owner_id = ? OR pm.user_id = ?", params.ParticipantID, params.ParticipantID)
+	}
 
 	// 关键词搜索
 	if params.Keyword != "" {
@@ -246,26 +251,33 @@ func (r *projectRepository) ListProjects(ctx context.Context, params *ListProjec
 	}
 	// 按创建者筛选
 	if params.OwnerID > 0 {
-		query = query.Where("owner_id = ?", params.OwnerID)
+		query = query.Where("projects.owner_id = ?", params.OwnerID)
 	}
 
 	// 统计总数
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	countQuery := query
+	if params.ParticipantID > 0 {
+		countQuery = countQuery.Distinct("projects.id")
+	}
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("统计项目总数失败: %w", err)
 	}
 
 	// 排序
 	switch params.SortBy {
 	case "hottest":
-		query = query.Order("follower_count DESC, created_at DESC")
+		query = query.Order("projects.follower_count DESC, projects.created_at DESC")
 	case "updated":
-		query = query.Order("updated_at DESC")
+		query = query.Order("projects.updated_at DESC")
 	default: // newest
-		query = query.Order("created_at DESC")
+		query = query.Order("projects.created_at DESC")
 	}
 
 	var projects []*model.Project
+	if params.ParticipantID > 0 {
+		query = query.Distinct("projects.*")
+	}
 	if err := query.Offset(params.Offset).Limit(params.Limit).Find(&projects).Error; err != nil {
 		return nil, 0, fmt.Errorf("查询项目列表失败: %w", err)
 	}

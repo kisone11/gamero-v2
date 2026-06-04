@@ -191,13 +191,14 @@ type ProjectListItem struct {
 
 // ListProjectsParams 项目列表查询参数
 type ListProjectsParams struct {
-	Page     int    // 页码（从1开始）
-	PageSize int    // 每页大小
-	Status   string // 按状态筛选（可选）
-	Genre    string // 按类型筛选（可选）
-	Keyword  string // 关键词搜索（可选）
-	OwnerID  uint64 // 按创建者筛选（可选）
-	SortBy   string // 排序字段：newest（默认）/ hottest / updated
+	Page          int    // 页码（从1开始）
+	PageSize      int    // 每页大小
+	Status        string // 按状态筛选（可选）
+	Genre         string // 按类型筛选（可选）
+	Keyword       string // 关键词搜索（可选）
+	OwnerID       uint64 // 按创建者筛选（可选）
+	ParticipantID uint64 // 按参与/创建者筛选（可选）
+	SortBy        string // 排序字段：newest（默认）/ hottest / updated
 }
 
 // ===========================
@@ -1251,11 +1252,12 @@ func (s *projectService) UpdateMember(ctx context.Context, ownerID, projectID, t
 // ListProjects 查询项目列表（带分页筛选）
 func (s *projectService) ListProjects(ctx context.Context, params ListProjectsParams) ([]*ProjectListItem, int64, error) {
 	repoParams := &repository.ListProjectsParams{
-		Keyword: params.Keyword,
-		OwnerID: params.OwnerID,
-		Offset:  (params.Page - 1) * params.PageSize,
-		Limit:   params.PageSize,
-		SortBy:  params.SortBy,
+		Keyword:       params.Keyword,
+		OwnerID:       params.OwnerID,
+		ParticipantID: params.ParticipantID,
+		Offset:        (params.Page - 1) * params.PageSize,
+		Limit:         params.PageSize,
+		SortBy:        params.SortBy,
 	}
 	if params.Status != "" {
 		repoParams.Status = model.ProjectStatus(params.Status)

@@ -425,13 +425,34 @@ func (h *ProjectHandler) DeleteVideo(c *gin.Context) {
 func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	pager := pagination.Parse(c)
 
+	sortBy := c.Query("sort_by")
+	if sortBy == "" {
+		sortBy = c.Query("sort")
+	}
+
 	params := service.ListProjectsParams{
 		Page:     pager.Page,
 		PageSize: pager.PageSize,
 		Status:   c.Query("status"),
 		Genre:    c.Query("genre"),
 		Keyword:  c.Query("keyword"),
-		SortBy:   c.Query("sort_by"), // newest（默认）/ hottest / updated
+		SortBy:   sortBy, // newest（默认）/ hottest / updated
+	}
+	if ownerID := c.Query("owner_id"); ownerID != "" {
+		id, err := strconv.ParseUint(ownerID, 10, 64)
+		if err != nil {
+			response.FailBadRequest(c, "owner_id 参数错误")
+			return
+		}
+		params.OwnerID = id
+	}
+	if participantID := c.Query("participant_id"); participantID != "" {
+		id, err := strconv.ParseUint(participantID, 10, 64)
+		if err != nil {
+			response.FailBadRequest(c, "participant_id 参数错误")
+			return
+		}
+		params.ParticipantID = id
 	}
 
 	items, total, err := h.svc.ListProjects(c.Request.Context(), params)

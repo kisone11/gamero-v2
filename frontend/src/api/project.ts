@@ -24,6 +24,7 @@ export interface ListProjectsParams {
   genre?: ProjectGenre
   status?: ProjectStatus
   owner_id?: number
+  participant_id?: number
   sort?: 'latest' | 'popular' | 'following'
 }
 
