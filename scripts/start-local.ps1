@@ -54,6 +54,22 @@ function Start-IfPortClosed {
     }
 }
 
+function Stop-PortProcess {
+    param(
+        [string]$Name,
+        [int]$Port
+    )
+
+    $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    foreach ($connection in $connections) {
+        $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+        if ($process) {
+            Write-Host "Stopping existing $Name on port ${Port} (pid $($process.Id))..."
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $Runtime)) {
     New-Item -ItemType Directory -Path $Runtime | Out-Null
 }
@@ -112,15 +128,14 @@ Start-IfPortClosed `
 Start-Sleep -Seconds 5
 
 $ServerExe = Join-Path $Backend "server-local.exe"
-if (-not (Test-Path -LiteralPath $ServerExe)) {
-    Write-Host "Building backend..."
-    Push-Location $Backend
-    try {
-        go build -o server-local.exe .\cmd\server
-    }
-    finally {
-        Pop-Location
-    }
+Stop-PortProcess -Name "Backend" -Port 8081
+Write-Host "Building backend..."
+Push-Location $Backend
+try {
+    go build -o server-local.exe .\cmd\server
+}
+finally {
+    Pop-Location
 }
 
 Start-IfPortClosed `
@@ -133,6 +148,7 @@ Start-IfPortClosed `
     -OutLog (Join-Path $Runtime "backend.out.log") `
     -ErrLog (Join-Path $Runtime "backend.err.log")
 
+Stop-PortProcess -Name "Frontend" -Port 5714
 Start-IfPortClosed `
     -Name "Frontend" `
     -HostName "127.0.0.1" `
