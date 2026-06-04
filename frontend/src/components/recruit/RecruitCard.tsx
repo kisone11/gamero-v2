@@ -20,16 +20,26 @@ function effectiveStatus(s: RecruitmentStatus, expireAt: string): RecruitmentSta
   return s === 'expired' || new Date(expireAt) < new Date() ? 'expired' : s
 }
 
-export function RecruitCard({ item }: { item: RecruitmentListItem }) {
+export function RecruitCard({ item, relationLabel }: { item: RecruitmentListItem; relationLabel?: '已参与' | '已申请' }) {
   const status = effectiveStatus(item.status, item.expire_at)
   const days = daysUntil(item.expire_at)
   const isUrgent = status === 'open' && days <= 3 && days > 0
 
   return (
     <Link to={`/recruit/${item.id}`}
-      className="group block bg-surface-card border border-white/[0.04] rounded-xl p-5
+      className="group relative block bg-surface-card border border-white/[0.04] rounded-xl p-5
                  hover:border-amber/20 hover:shadow-[0_4px_24px_rgba(0,0,0,0.25)]
                  hover:-translate-y-[1px] transition-all duration-200">
+      {relationLabel && (
+        <span className={cn(
+          'absolute right-4 top-4 px-2.5 py-1 rounded-full text-[11px] font-semibold border',
+          relationLabel === '已参与'
+            ? 'bg-success/10 text-success border-success/20'
+            : 'bg-amber/10 text-amber border-amber/20',
+        )}>
+          {relationLabel}
+        </span>
+      )}
       <div className="flex items-start gap-3">
         <div className="w-12 h-12 rounded-[10px] bg-gradient-to-br from-surface-deep to-surface-hover
                         flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform duration-200">

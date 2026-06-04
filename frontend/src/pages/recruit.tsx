@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Search, Zap, Code2, Palette, ClipboardList, Music, Plus } from 'lucide-react'
+import { projectApi } from '@/api/project'
 import { recruitApi, type ListRecruitmentsParams } from '@/api/recruit'
 import { RecruitCard } from '@/components/recruit/RecruitCard'
 import { Button } from '@/components/ui/button'
 import { Pagination } from '@/components/ui'
+import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import type { RecruitmentPosition } from '@/types/enums'
 
@@ -33,6 +35,7 @@ function Skeleton() {
 }
 
 export default function RecruitPage() {
+  const user = useAuthStore((s) => s.user)
   const [position, setPosition] = useState<RecruitmentPosition | ''>('')
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
@@ -42,8 +45,26 @@ export default function RecruitPage() {
     queryFn: () => recruitApi.list({ page, page_size: 20, position: position || undefined, keyword: keyword || undefined } as ListRecruitmentsParams),
   })
 
+  const myProjectsQuery = useQuery({
+    queryKey: ['my-recruit-project-relations', user?.id],
+    queryFn: () => projectApi.list({ page: 1, page_size: 100, participant_id: user!.id }),
+    enabled: !!user,
+    staleTime: 30000,
+  })
+
+  const myApplicationsQuery = useQuery({
+    queryKey: ['my-recruit-application-relations', user?.id],
+    queryFn: () => recruitApi.listMyApplications(1, 100),
+    enabled: !!user,
+    staleTime: 30000,
+  })
+
   const items = query.data?.list ?? []
   const pages = query.data?.pages ?? 1
+  const myProjectIds = new Set((myProjectsQuery.data?.list ?? []).map((project) => project.id))
+  const pendingRecruitmentIds = new Set((myApplicationsQuery.data?.list ?? [])
+    .filter((application) => application.status === 'pending')
+    .map((application) => application.recruitment_id))
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
@@ -106,7 +127,10 @@ export default function RecruitPage() {
           <div className="space-y-3">
             {items.map((item, i) => (
               <div key={item.id} className="animate-slide-up" style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'backwards' }}>
-                <RecruitCard item={item} />
+                <RecruitCard
+                  item={item}
+                  relationLabel={myProjectIds.has(item.project_id) ? '已参与' : pendingRecruitmentIds.has(item.id) ? '已申请' : undefined}
+                />
               </div>
             ))}
           </div>

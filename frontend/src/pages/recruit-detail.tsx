@@ -48,11 +48,35 @@ export default function RecruitDetailPage() {
   const { data: apps } = useQuery({
     queryKey: ['recruitment-applications', id], queryFn: () => recruitApi.getApplications(Number(id)), enabled: !!id && isOwner,
   })
+  const { data: myApplications } = useQuery({
+    queryKey: ['my-applications', me?.id],
+    queryFn: () => recruitApi.listMyApplications(1, 100),
+    enabled: !!me,
+  })
+  const pendingApplication = (myApplications?.list ?? []).find((app) => app.recruitment_id === Number(id) && app.status === 'pending')
+
+  const submitApplication = () => {
+    if (pendingApplication) {
+      setApplied(true)
+      setApplyOpen(false)
+      toast.info('正在申请中，请勿重复申请')
+      return
+    }
+    applyMut.mutate()
+  }
 
   const applyMut = useMutation({
     mutationFn: () => recruitApi.apply(Number(id), { position: d!.position, message: message.trim() || undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['recruitment', id] }); setApplied(true); toast.success('申请已发送') },
-    onError: (e: any) => toast.error(e?.response?.data?.message || '申请失败'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['recruitment', id] }); qc.invalidateQueries({ queryKey: ['my-applications'] }); setApplied(true); toast.success('申请已发送') },
+    onError: (e: any) => {
+      const message = e?.response?.data?.message || e?.message || ''
+      if (message.includes('已申请') || message.includes('重复') || message.includes('pending')) {
+        setApplied(true)
+        toast.info('正在申请中，请勿重复申请')
+        return
+      }
+      toast.error(message || '申请失败')
+    },
   })
   const closeMut = useMutation({
     mutationFn: () => recruitApi.close(Number(id)),
@@ -178,7 +202,7 @@ export default function RecruitDetailPage() {
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" size="sm" onClick={() => setApplyOpen(false)}>取消</Button>
-                <Button size="sm" loading={applyMut.isPending} onClick={() => applyMut.mutate()} icon={<Sparkles className="w-4 h-4" />}>提交申请</Button>
+                <Button size="sm" loading={applyMut.isPending} onClick={submitApplication} icon={<Sparkles className="w-4 h-4" />}>提交申请</Button>
               </div>
             </div>
           )}
@@ -188,8 +212,8 @@ export default function RecruitDetailPage() {
       {!isOwner && isOpen && me && applied && (
         <div className="mb-6 bg-success/[0.04] border border-success/10 rounded-xl p-6 text-center animate-bounce-in">
           <PartyPopper className="w-8 h-8 text-success mb-2 mx-auto" />
-          <h3 className="text-[16px] font-bold text-success mb-1">申请已发送！</h3>
-          <p className="text-[13px] text-text-secondary mb-4">项目负责人将在 3-7 天内回复</p>
+          <h3 className="text-[16px] font-bold text-success mb-1">{pendingApplication ? '正在申请中' : '申请已发送！'}</h3>
+          <p className="text-[13px] text-text-secondary mb-4">{pendingApplication ? '请勿重复申请，等待项目负责人处理' : '项目负责人将在 3-7 天内回复'}</p>
           <div className="flex gap-3 justify-center">
             <Link to="/me/applications"><Button variant="primary" size="sm" icon={<ClipboardCheck className="w-4 h-4" />}>查看我的申请</Button></Link>
             <Link to="/recruit"><Button variant="secondary" size="sm">← 返回招募广场</Button></Link>
