@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Search, Plus } from 'lucide-react'
+import { AlertTriangle, Search, Plus, LayoutDashboard, Users, ClipboardList, ScrollText, Rocket, UserPlus } from 'lucide-react'
 import { projectApi } from '@/api/project'
 import { recruitApi } from '@/api/recruit'
 import { RecruitCard } from '@/components/recruit/RecruitCard'
 import { useAuthStore } from '@/stores/authStore'
-import { Button, Tabs, EmptyState, Skeleton } from '@/components/ui'
+import { Button, Tabs, EmptyState, Skeleton, Card, Badge } from '@/components/ui'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { toast } from '@/stores/toastStore'
 import {
@@ -23,6 +23,60 @@ const TABS = [
   { value: 'recruit', label: '招募' },
   { value: 'reviews', label: '评测' },
 ]
+
+function ProjectWorkspace({
+  project,
+  isOwner,
+  onOpenTab,
+}: {
+  project: ProjectDetail
+  isOwner: boolean
+  onOpenTab: (tab: string) => void
+}) {
+  return (
+    <Card hover={false} padding="lg" className="mb-5 bg-gradient-to-br from-amber/[0.05] to-white/[0.02] border-amber/10">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <LayoutDashboard className="w-4 h-4 text-amber" />
+            <h2 className="text-[15px] font-semibold text-text-primary">项目工作台</h2>
+            <Badge variant={isOwner ? 'success' : 'default'} size="sm">{isOwner ? '负责人' : '成员'}</Badge>
+          </div>
+          <p className="text-[12px] text-text-muted">集中处理任务、成员、版本、日志和招募，不影响下方原有详情内容。</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <button onClick={() => onOpenTab('tasks')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <ClipboardList className="w-3.5 h-3.5" />任务看板
+        </button>
+        <button onClick={() => onOpenTab('members')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <Users className="w-3.5 h-3.5" />成员协作
+        </button>
+        <Link to={`/project/${project.id}/releases`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <Rocket className="w-3.5 h-3.5" />版本发布
+        </Link>
+        {isOwner ? (
+          <Link to={`/projects/${project.id}/logs/new`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+            <ScrollText className="w-3.5 h-3.5" />写日志
+          </Link>
+        ) : (
+          <button onClick={() => onOpenTab('dev-logs')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+            <ScrollText className="w-3.5 h-3.5" />看日志
+          </button>
+        )}
+        {isOwner ? (
+          <Link to={`/p/${project.slug}/recruit/new`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+            <UserPlus className="w-3.5 h-3.5" />发招募
+          </Link>
+        ) : (
+          <button onClick={() => onOpenTab('recruit')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+            <UserPlus className="w-3.5 h-3.5" />看招募
+          </button>
+        )}
+      </div>
+    </Card>
+  )
+}
 
 // ============================================================
 // LoadingSkeleton
@@ -114,6 +168,7 @@ export default function ProjectDetailPage() {
 
   const project = projectQuery.data
   const isOwner = !!(user && project?.owner_id === user.id)
+  const isProjectMember = !!(user && project?.members?.some((member) => member.user_id === user.id))
 
   // ── Mutations ──
 
@@ -202,6 +257,9 @@ export default function ProjectDetailPage() {
       <div className="max-w-6xl mx-auto px-6 py-6">
         <div className="grid grid-cols-12 gap-6">
           <main className="col-span-12 lg:col-span-9">
+            {(isOwner || isProjectMember) && (
+              <ProjectWorkspace project={project} isOwner={isOwner} onOpenTab={setTab} />
+            )}
             <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
             {tab === 'overview' && <ProjectOverviewTab project={project} />}
