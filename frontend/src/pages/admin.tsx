@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, Pencil, Trash2, AlertTriangle, Hash,
+  Plus, Pencil, Trash2, AlertTriangle, Hash, ShieldCheck,
 } from 'lucide-react'
 import { communityApi } from '@/api/community'
 import { adminApi } from '@/api/admin'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs } from '@/components/ui/tabs'
+import { Pagination } from '@/components/ui/pagination'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/empty-state'
 import { toast } from '@/stores/toastStore'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { OverviewTab, ReportsTab, UsersTab, ContentTab, SensitiveWordsTab, TopicSkeleton } from '@/components/admin'
+import type { AuditLog } from '@/types/api'
 
 // ============================================================
 // TopicsTab
@@ -121,6 +123,56 @@ function TopicsTab() {
   )
 }
 
+function AuditLogsTab() {
+  const [page, setPage] = useState(1)
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['admin', 'audit-logs', page],
+    queryFn: () => adminApi.getAuditLogs({ page, page_size: 20 }),
+  })
+  const logs = data?.list ?? []
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-[15px] font-semibold text-text-primary">审计日志</h3>
+          <p className="text-[12px] text-text-muted mt-1">记录封禁、删帖、处理举报等后台敏感操作。</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => refetch()}>刷新</Button>
+      </div>
+
+      {isLoading && <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <TopicSkeleton key={i} />)}</div>}
+      {isError && <EmptyState icon={<AlertTriangle className="w-7 h-7 text-text-muted" />} title="加载失败" action={{ label: '重试', onClick: () => refetch() }} />}
+      {!isLoading && !isError && logs.length === 0 && <EmptyState icon={<ShieldCheck className="w-7 h-7 text-text-muted" />} title="暂无审计日志" />}
+
+      {logs.length > 0 && (
+        <>
+          <div className="space-y-3">
+            {logs.map((log: AuditLog) => (
+              <Card key={log.id} padding="md" hover={false}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="rounded-full bg-amber/10 text-amber px-2 py-0.5 text-[11px] font-semibold">{log.action}</span>
+                      <span className="text-[11px] text-text-muted font-mono">管理员 #{log.admin_id}</span>
+                    </div>
+                    <p className="text-[13px] text-text-secondary">
+                      目标：{log.target_type} #{log.target_id}
+                    </p>
+                    {log.note && <p className="text-[12px] text-text-muted mt-1 line-clamp-2">{log.note}</p>}
+                  </div>
+                  <span className="text-[11px] text-text-muted font-mono shrink-0">{new Date(log.created_at).toLocaleString('zh-CN')}</span>
+                </div>
+              </Card>
+            ))}
+          </div>
+          <Pagination page={page} pages={data?.pages ?? 1} onChange={setPage} />
+        </>
+      )}
+    </div>
+  )
+}
+
 // ============================================================
 // AdminPage
 // ============================================================
@@ -139,6 +191,7 @@ export default function AdminPage() {
           { value: 'content', label: '内容管理' },
           { value: 'topics', label: '话题管理' },
           { value: 'sensitive', label: '敏感词' },
+          { value: 'audit', label: '审计日志' },
         ]}
         value={tab}
         onChange={setTab}
@@ -150,6 +203,7 @@ export default function AdminPage() {
         {tab === 'content' && <ContentTab />}
         {tab === 'topics' && <TopicsTab />}
         {tab === 'sensitive' && <SensitiveWordsTab />}
+        {tab === 'audit' && <AuditLogsTab />}
       </div>
     </div>
   )
