@@ -784,3 +784,17 @@ export interface AuditLog {
   note?: string
   created_at: string
 }
+
+export interface Announcement {
+  id: number
+  title: string
+  content: string
+  level: 'info' | 'warning' | 'danger' | 'success'
+  is_active: boolean
+  is_pinned: boolean
+  created_by: number
+  published_at: string
+  expires_at?: string | null
+  created_at: string
+  updated_at: string
+}

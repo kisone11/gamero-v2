@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { MessageSquare, Gamepad2, ScrollText, TrendingUp, Users, Zap } from 'lucide-react'
 import { discoverApi, type FeedItem } from '@/api/discover'
+import { announcementApi } from '@/api/announcement'
 import { projectApi } from '@/api/project'
 import { userApi } from '@/api/user'
 import { useAuthStore } from '@/stores/authStore'
@@ -42,6 +43,12 @@ export default function FeedPage() {
   const { data: hotProjects } = useQuery({
     queryKey: ['hot-projects'],
     queryFn: () => discoverApi.getRecommendedProjects(1, 5),
+    staleTime: 60000,
+  })
+
+  const { data: announcements } = useQuery({
+    queryKey: ['public-announcements'],
+    queryFn: () => announcementApi.listPublic(3),
     staleTime: 60000,
   })
 
@@ -197,6 +204,25 @@ export default function FeedPage() {
         {/* Right Sidebar */}
         <aside className="hidden xl:block w-[260px] shrink-0">
           <div className="sticky top-[88px] space-y-4">
+            {announcements && announcements.length > 0 && (
+              <div className="bg-surface-card border border-amber/10 rounded-xl p-4">
+                <h3 className="text-[13px] font-semibold text-text-primary mb-3 flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-amber" />站内公告
+                </h3>
+                <div className="space-y-3">
+                  {announcements.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-white/[0.04] p-3 bg-white/[0.02]">
+                      <div className="flex items-center gap-2 mb-1">
+                        {item.is_pinned && <span className="text-[10px] text-amber font-semibold">置顶</span>}
+                        <span className="text-[10px] text-text-muted font-mono">{item.level}</span>
+                      </div>
+                      <p className="text-[12px] font-semibold text-text-primary line-clamp-1">{item.title}</p>
+                      <p className="text-[11px] text-text-muted mt-1 line-clamp-2">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {hotProjects && (hotProjects as any).list?.length > 0 && (
               <div className="bg-surface-card border border-white/[0.04] rounded-xl p-4">
                 <h3 className="text-[13px] font-semibold text-text-primary mb-3 flex items-center gap-1.5">

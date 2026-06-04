@@ -97,6 +97,8 @@ func main() {
 		&model.ProjectStats{}, // 项目每日统计快照表
 		// 敏感词表
 		&model.SensitiveWord{}, // 敏感词持久化表
+		// 运营公告
+		&model.Announcement{}, // 站内公告表
 	); err != nil {
 		logger.Fatal("数据库迁移失败", zap.Error(err))
 	}
@@ -145,6 +147,8 @@ func main() {
 			// 实名认证
 			// 敏感词
 			model.SensitiveWord{}.TableName(),
+			// 运营公告
+			model.Announcement{}.TableName(),
 		}),
 	)
 

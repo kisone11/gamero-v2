@@ -87,19 +87,20 @@ func Setup(ctx context.Context, cfg *config.Config) *gin.Engine {
 
 	// 注意：模块注册顺序决定了 svc 挂载顺序，community 依赖 project svc，需在其之后注册
 	modules.RegisterUserRoutes(v1, deps)
-	modules.RegisterProjectRoutes(v1, deps)   // → deps.ProjectSvc
-	modules.RegisterTeamRoutes(v1, deps)       // → deps.TeamSvc
-	modules.RegisterDevLogRoutes(v1, deps)     // → deps.DevLogSvc
-	modules.RegisterFollowRoutes(v1, deps)     // → deps.FollowSvc
-	modules.RegisterFeedRoutes(v1, deps)       // deps.FeedSvc
+	modules.RegisterProjectRoutes(v1, deps) // → deps.ProjectSvc
+	modules.RegisterTeamRoutes(v1, deps)    // → deps.TeamSvc
+	modules.RegisterDevLogRoutes(v1, deps)  // → deps.DevLogSvc
+	modules.RegisterFollowRoutes(v1, deps)  // → deps.FollowSvc
+	modules.RegisterFeedRoutes(v1, deps)    // deps.FeedSvc
 	// community 须在 project 之后注册：内部会调用 deps.ProjectSvc.SetBroker + mq.RegisterSubscribers
-	modules.RegisterCommunityRoutes(v1, deps)  // → deps.CommunitySvc
+	modules.RegisterCommunityRoutes(v1, deps) // → deps.CommunitySvc
 	modules.RegisterDiscoverRoutes(v1, deps)
 	modules.RegisterReviewRoutes(v1, deps)
-	modules.RegisterStatsRoutes(v1, deps)      // → deps.StatsSvc
+	modules.RegisterStatsRoutes(v1, deps) // → deps.StatsSvc
 	modules.RegisterAdminRoutes(v1, deps)
-	modules.RegisterUploadRoutes(v1, deps)   // 前端直传云存储凭证
-	modules.RegisterModerationRoutes(v1, deps)  // 腾讯云 COS 审核回调
+	modules.RegisterAnnouncementRoutes(v1, deps)
+	modules.RegisterUploadRoutes(v1, deps)     // 前端直传云存储凭证
+	modules.RegisterModerationRoutes(v1, deps) // 腾讯云 COS 审核回调
 
 	// ========== 启动后台定时任务 ==========
 	// 所有 svc 完成挂载后启动，保证 deps 字段已填充
