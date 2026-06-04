@@ -219,23 +219,23 @@ export default function DevLogDetailPage() {
               <div className="p-5 border-b border-white/[0.04]">
                 {/* Back and actions */}
                 <div className="flex items-center justify-between mb-4">
-                  {log.project_slug ? (
+                  <div className="flex items-center gap-3">
                     <Link
-                      to={`/p/${log.project_slug}`}
+                      to="/devlogs"
                       className="flex items-center gap-1.5 text-[13px] text-text-muted hover:text-amber transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                      返回项目
+                      返回开发日志
                     </Link>
-                  ) : (
-                    <button
-                      onClick={() => window.history.back()}
-                      className="flex items-center gap-1.5 text-[13px] text-text-muted hover:text-amber transition-colors"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      返回
-                    </button>
-                  )}
+                    {log.project_slug && (
+                      <Link
+                        to={`/p/${log.project_slug}`}
+                        className="flex items-center gap-1.5 text-[13px] text-text-muted hover:text-amber transition-colors"
+                      >
+                        返回项目
+                      </Link>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" onClick={handleShare}>
