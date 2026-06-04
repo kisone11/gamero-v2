@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Search, Bell, LogOut, User, Settings, Plus, Gamepad2, Flag, CheckCheck, UserPlus, CheckCircle, XCircle, AtSign, Heart, MessageSquare, ThumbsUp, Send, Ban, ClipboardCheck, RefreshCw, X, Shield } from 'lucide-react'
+import { Search, Bell, LogOut, User, Settings, Plus, Gamepad2, Flag, CheckCheck, UserPlus, CheckCircle, XCircle, AtSign, Heart, MessageSquare, ThumbsUp, Send, Ban, ClipboardCheck, RefreshCw, X, Shield, LayoutDashboard } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
@@ -14,6 +14,7 @@ import type { Notification } from '@/types/api'
 
 const NAV_LINKS = [
   { href: '/feed', label: '动态' },
+  { href: '/me/collaboration', label: '协作' },
   { href: '/projects', label: '发现' },
   { href: '/community', label: '社区' },
   { href: '/recruit', label: '招募' },
@@ -302,6 +303,10 @@ export function Navbar() {
                       <Link to={`/u/${user.username || user.id}`} className="flex items-center gap-3 px-3 py-2.5 text-[13px] text-text-secondary hover:text-text-primary hover:bg-white/[0.03] transition-colors" onClick={() => setMenuOpen(false)}>
                         <User className="w-4 h-4 text-text-muted" />
                         个人主页
+                      </Link>
+                      <Link to="/me/collaboration" className="flex items-center gap-3 px-3 py-2.5 text-[13px] text-text-secondary hover:text-text-primary hover:bg-white/[0.03] transition-colors" onClick={() => setMenuOpen(false)}>
+                        <LayoutDashboard className="w-4 h-4 text-text-muted" />
+                        协作中心
                       </Link>
                       <Link to="/settings" className="flex items-center gap-3 px-3 py-2.5 text-[13px] text-text-secondary hover:text-text-primary hover:bg-white/[0.03] transition-colors" onClick={() => setMenuOpen(false)}>
                         <Settings className="w-4 h-4 text-text-muted" />

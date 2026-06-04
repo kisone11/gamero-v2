@@ -29,6 +29,7 @@ import RecruitPage from '@/pages/recruit'
 import RecruitDetailPage from '@/pages/recruit-detail'
 import CreateRecruitPage from '@/pages/create-recruit'
 import TalentPage from '@/pages/talent'
+import CollaborationCenterPage from '@/pages/collaboration-center'
 import MyApplicationsPage from '@/pages/my-applications'
 import MyInvitationsPage from '@/pages/my-invitations'
 import MyLogsPage from '@/pages/my-logs'
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/recruit/new" element={<CreateRecruitPage />} />
         <Route path="/recruit/:id" element={<RecruitDetailPage />} />
         <Route path="/talent" element={<TalentPage />} />
+        <Route path="/me/collaboration" element={<CollaborationCenterPage />} />
         <Route path="/me/applications" element={<MyApplicationsPage />} />
         <Route path="/me/invitations" element={<MyInvitationsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
