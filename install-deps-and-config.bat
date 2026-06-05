@@ -10,6 +10,10 @@ echo ============================================================
 echo Gamero dependency installer and local configuration helper
 echo ============================================================
 echo.
+echo If PostgreSQL, Redis, MinIO, or Mailpit are missing, run:
+echo   download-local-runtime.bat
+echo before start-local.bat.
+echo.
 
 where node >nul 2>nul
 if errorlevel 1 (
