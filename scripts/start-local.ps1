@@ -76,18 +76,65 @@ if (-not (Test-Path -LiteralPath $Runtime)) {
 
 $PostgresBin = Join-Path $Runtime "postgres\pgsql\bin"
 $PostgresData = Join-Path $Runtime "pgdata"
+$PostgresPort = 55432
 $RedisDir = Join-Path $Runtime "redis"
 $RedisData = Join-Path $Runtime "redis-data"
 $MinioDir = Join-Path $Runtime "minio"
 $MinioData = Join-Path $Runtime "minio-data"
 $MailpitDir = Join-Path $Runtime "mailpit"
 
+function Stop-RuntimePostgresIfNeeded {
+    param([string]$RuntimePostgresBin)
+
+    if (Test-Port -HostName "127.0.0.1" -Port $PostgresPort) {
+        return
+    }
+
+    $runtimeBin = (Resolve-Path -LiteralPath $RuntimePostgresBin -ErrorAction SilentlyContinue)
+    if (-not $runtimeBin) {
+        return
+    }
+
+    $processes = Get-Process -Name "postgres" -ErrorAction SilentlyContinue
+    foreach ($process in $processes) {
+        if ($process.Path -and $process.Path.StartsWith($runtimeBin.Path, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Host "Stopping old bundled PostgreSQL process (pid $($process.Id)) before switching to port $PostgresPort..."
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Ensure-PostgresDatabase {
+    $psql = Join-Path $PostgresBin "psql.exe"
+    $createdb = Join-Path $PostgresBin "createdb.exe"
+
+    for ($i = 0; $i -lt 20; $i++) {
+        if (Test-Port -HostName "127.0.0.1" -Port $PostgresPort) {
+            break
+        }
+        Start-Sleep -Seconds 1
+    }
+
+    if (-not (Test-Port -HostName "127.0.0.1" -Port $PostgresPort)) {
+        throw "PostgreSQL did not start on 127.0.0.1:$PostgresPort. Run download-local-runtime.bat first if runtime files are missing."
+    }
+
+    Write-Host "Ensuring PostgreSQL role/database for Gamero..."
+    & $psql -h localhost -p $PostgresPort -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'gamero') THEN CREATE ROLE gamero WITH LOGIN PASSWORD 'gamero123'; ELSE ALTER ROLE gamero WITH LOGIN PASSWORD 'gamero123'; END IF; END `$`$;" | Out-Host
+    $exists = (& $psql -h localhost -p $PostgresPort -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'gamero'").Trim()
+    if ($exists -ne "1") {
+        & $createdb -h localhost -p $PostgresPort -U postgres -O gamero gamero | Out-Host
+    }
+}
+
+Stop-RuntimePostgresIfNeeded -RuntimePostgresBin $PostgresBin
+
 Start-IfPortClosed `
     -Name "PostgreSQL" `
     -HostName "127.0.0.1" `
-    -Port 5432 `
+    -Port $PostgresPort `
     -FilePath (Join-Path $PostgresBin "pg_ctl.exe") `
-    -ArgumentList "start -D `"$PostgresData`" -l `"$(Join-Path $Runtime "postgres.log")`"" `
+    -ArgumentList "start -D `"$PostgresData`" -o `"-p $PostgresPort`" -l `"$(Join-Path $Runtime "postgres.log")`"" `
     -WorkingDirectory $PostgresBin `
     -OutLog $null `
     -ErrLog $null
@@ -126,6 +173,7 @@ Start-IfPortClosed `
     -ErrLog $null
 
 Start-Sleep -Seconds 5
+Ensure-PostgresDatabase
 
 $ServerExe = Join-Path $Backend "server-local.exe"
 Stop-PortProcess -Name "Backend" -Port 8081

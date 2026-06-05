@@ -14,6 +14,7 @@ $RedisData = Join-Path $Runtime "redis-data"
 $MinioDir = Join-Path $Runtime "minio"
 $MinioData = Join-Path $Runtime "minio-data"
 $MailpitDir = Join-Path $Runtime "mailpit"
+$PostgresPort = 55432
 
 function Ensure-Directory {
     param([string]$Path)
@@ -100,21 +101,21 @@ function Ensure-PostgresDatabase {
     $createdb = Join-Path $PostgresBin "createdb.exe"
 
     $startedHere = $false
-    $portOpen = Test-NetConnection -ComputerName 127.0.0.1 -Port 5432 -InformationLevel Quiet -WarningAction SilentlyContinue
+    $portOpen = Test-NetConnection -ComputerName 127.0.0.1 -Port $PostgresPort -InformationLevel Quiet -WarningAction SilentlyContinue
     if (-not $portOpen) {
         Write-Host "Starting PostgreSQL temporarily to create gamero database..."
-        & $pgCtl start -D $PostgresData -l (Join-Path $Runtime "postgres-init.log") | Out-Host
+        & $pgCtl start -D $PostgresData -o "-p $PostgresPort" -l (Join-Path $Runtime "postgres-init.log") | Out-Host
         $startedHere = $true
         Start-Sleep -Seconds 3
     }
 
     try {
-        & $psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'gamero') THEN CREATE ROLE gamero WITH LOGIN PASSWORD 'gamero123'; ELSE ALTER ROLE gamero WITH LOGIN PASSWORD 'gamero123'; END IF; END `$`$;" | Out-Host
-        & $psql -h localhost -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'gamero'" | ForEach-Object {
+        & $psql -h localhost -p $PostgresPort -U postgres -d postgres -v ON_ERROR_STOP=1 -c "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'gamero') THEN CREATE ROLE gamero WITH LOGIN PASSWORD 'gamero123'; ELSE ALTER ROLE gamero WITH LOGIN PASSWORD 'gamero123'; END IF; END `$`$;" | Out-Host
+        & $psql -h localhost -p $PostgresPort -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'gamero'" | ForEach-Object {
             if ($_.Trim() -eq "1") { $script:GameroDbExists = $true }
         }
         if (-not $script:GameroDbExists) {
-            & $createdb -h localhost -p 5432 -U postgres -O gamero gamero | Out-Host
+            & $createdb -h localhost -p $PostgresPort -U postgres -O gamero gamero | Out-Host
         }
     }
     finally {
