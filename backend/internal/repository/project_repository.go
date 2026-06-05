@@ -113,6 +113,21 @@ type ProjectRepository interface {
 	GetTaskByID(ctx context.Context, projectID, taskID uint64) (*model.ProjectTask, error)
 	UpdateTask(ctx context.Context, projectID, taskID uint64, updates map[string]interface{}) error
 	DeleteTask(ctx context.Context, projectID, taskID uint64) error
+	ListMilestones(ctx context.Context, projectID uint64) ([]*model.ProjectMilestone, error)
+	CreateMilestone(ctx context.Context, milestone *model.ProjectMilestone) error
+	GetMilestoneByID(ctx context.Context, projectID, milestoneID uint64) (*model.ProjectMilestone, error)
+	UpdateMilestone(ctx context.Context, projectID, milestoneID uint64, updates map[string]interface{}) error
+	DeleteMilestone(ctx context.Context, projectID, milestoneID uint64) error
+	ListResources(ctx context.Context, projectID uint64) ([]*model.ProjectResource, error)
+	CreateResource(ctx context.Context, resource *model.ProjectResource) error
+	GetResourceByID(ctx context.Context, projectID, resourceID uint64) (*model.ProjectResource, error)
+	UpdateResource(ctx context.Context, projectID, resourceID uint64, updates map[string]interface{}) error
+	DeleteResource(ctx context.Context, projectID, resourceID uint64) error
+	ListRisks(ctx context.Context, projectID uint64) ([]*model.ProjectRisk, error)
+	CreateRisk(ctx context.Context, risk *model.ProjectRisk) error
+	GetRiskByID(ctx context.Context, projectID, riskID uint64) (*model.ProjectRisk, error)
+	UpdateRisk(ctx context.Context, projectID, riskID uint64, updates map[string]interface{}) error
+	DeleteRisk(ctx context.Context, projectID, riskID uint64) error
 }
 
 // ListProjectsParams 项目列表查询参数
@@ -895,4 +910,209 @@ func (r *projectRepository) ListProjectsAdvanced(ctx context.Context, filter Pro
 	}
 
 	return projects, total, nil
+}
+
+func (r *projectRepository) ListMilestones(ctx context.Context, projectID uint64) ([]*model.ProjectMilestone, error) {
+	var milestones []*model.ProjectMilestone
+	if err := r.db.WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Order("CASE status WHEN 'active' THEN 1 WHEN 'planned' THEN 2 ELSE 3 END, due_date IS NULL, due_date ASC, created_at DESC").
+		Find(&milestones).Error; err != nil {
+		if isMissingMilestoneTable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "里程碑表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询里程碑失败: %w", err)
+	}
+	return milestones, nil
+}
+
+func (r *projectRepository) CreateMilestone(ctx context.Context, milestone *model.ProjectMilestone) error {
+	if err := r.db.WithContext(ctx).Create(milestone).Error; err != nil {
+		if isMissingMilestoneTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "里程碑表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("创建里程碑失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) GetMilestoneByID(ctx context.Context, projectID, milestoneID uint64) (*model.ProjectMilestone, error) {
+	var milestone model.ProjectMilestone
+	err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, milestoneID).First(&milestone).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.CodeError(apperrors.CodeNotFound)
+		}
+		if isMissingMilestoneTable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "里程碑表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询里程碑失败: %w", err)
+	}
+	return &milestone, nil
+}
+
+func (r *projectRepository) UpdateMilestone(ctx context.Context, projectID, milestoneID uint64, updates map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&model.ProjectMilestone{}).
+		Where("project_id = ? AND id = ?", projectID, milestoneID).
+		Updates(updates).Error; err != nil {
+		if isMissingMilestoneTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "里程碑表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("更新里程碑失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) DeleteMilestone(ctx context.Context, projectID, milestoneID uint64) error {
+	if err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, milestoneID).
+		Delete(&model.ProjectMilestone{}).Error; err != nil {
+		if isMissingMilestoneTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "里程碑表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("删除里程碑失败: %w", err)
+	}
+	return nil
+}
+
+func isMissingMilestoneTable(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "project_milestones") && (strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "42p01") ||
+		strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "doesn't exist"))
+}
+
+func (r *projectRepository) ListResources(ctx context.Context, projectID uint64) ([]*model.ProjectResource, error) {
+	var resources []*model.ProjectResource
+	if err := r.db.WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Order("is_pinned DESC, category ASC, updated_at DESC").
+		Find(&resources).Error; err != nil {
+		if isMissingResourceTable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "项目资料库表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询项目资料失败: %w", err)
+	}
+	return resources, nil
+}
+
+func (r *projectRepository) CreateResource(ctx context.Context, resource *model.ProjectResource) error {
+	if err := r.db.WithContext(ctx).Create(resource).Error; err != nil {
+		if isMissingResourceTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目资料库表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("创建项目资料失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) GetResourceByID(ctx context.Context, projectID, resourceID uint64) (*model.ProjectResource, error) {
+	var resource model.ProjectResource
+	err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, resourceID).First(&resource).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.CodeError(apperrors.CodeNotFound)
+		}
+		if isMissingResourceTable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "项目资料库表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询项目资料失败: %w", err)
+	}
+	return &resource, nil
+}
+
+func (r *projectRepository) UpdateResource(ctx context.Context, projectID, resourceID uint64, updates map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&model.ProjectResource{}).
+		Where("project_id = ? AND id = ?", projectID, resourceID).
+		Updates(updates).Error; err != nil {
+		if isMissingResourceTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目资料库表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("更新项目资料失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) DeleteResource(ctx context.Context, projectID, resourceID uint64) error {
+	if err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, resourceID).
+		Delete(&model.ProjectResource{}).Error; err != nil {
+		if isMissingResourceTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目资料库表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("删除项目资料失败: %w", err)
+	}
+	return nil
+}
+
+func isMissingResourceTable(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "project_resources") && (strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "42p01") ||
+		strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "doesn't exist"))
+}
+
+func (r *projectRepository) ListRisks(ctx context.Context, projectID uint64) ([]*model.ProjectRisk, error) {
+	var risks []*model.ProjectRisk
+	if err := r.db.WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Order("CASE level WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, status ASC, due_date IS NULL, due_date ASC, updated_at DESC").
+		Find(&risks).Error; err != nil {
+		if isMissingRiskTable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "项目风险表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询项目风险失败: %w", err)
+	}
+	return risks, nil
+}
+
+func (r *projectRepository) CreateRisk(ctx context.Context, risk *model.ProjectRisk) error {
+	if err := r.db.WithContext(ctx).Create(risk).Error; err != nil {
+		if isMissingRiskTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目风险表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("创建项目风险失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) GetRiskByID(ctx context.Context, projectID, riskID uint64) (*model.ProjectRisk, error) {
+	var risk model.ProjectRisk
+	err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, riskID).First(&risk).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.CodeError(apperrors.CodeNotFound)
+		}
+		if isMissingRiskTable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "项目风险表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询项目风险失败: %w", err)
+	}
+	return &risk, nil
+}
+
+func (r *projectRepository) UpdateRisk(ctx context.Context, projectID, riskID uint64, updates map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&model.ProjectRisk{}).Where("project_id = ? AND id = ?", projectID, riskID).Updates(updates).Error; err != nil {
+		if isMissingRiskTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目风险表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("更新项目风险失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) DeleteRisk(ctx context.Context, projectID, riskID uint64) error {
+	if err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, riskID).Delete(&model.ProjectRisk{}).Error; err != nil {
+		if isMissingRiskTable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目风险表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("删除项目风险失败: %w", err)
+	}
+	return nil
+}
+
+func isMissingRiskTable(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "project_risks") && (strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "42p01") || strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist"))
 }

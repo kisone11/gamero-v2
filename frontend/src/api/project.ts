@@ -3,6 +3,12 @@ import type {
   ApiResponse,
   PageData,
   ProjectDetail,
+  ProjectMilestone,
+  ProjectMilestoneReq,
+  ProjectResource,
+  ProjectResourceReq,
+  ProjectRisk,
+  ProjectRiskReq,
   ProjectTask,
   ProjectTaskReq,
   ProjectListItem,
@@ -112,6 +118,42 @@ export const projectApi = {
 
   deleteTask: (id: number | string, taskId: number) =>
     http.delete<ApiResponse<null>>(`/projects/${id}/tasks/${taskId}`).then(extractData),
+
+  listMilestones: (id: number | string) =>
+    http.get<ApiResponse<ProjectMilestone[]>>(`/projects/${id}/milestones`).then(extractData),
+
+  createMilestone: (id: number | string, data: ProjectMilestoneReq) =>
+    http.post<ApiResponse<ProjectMilestone>>(`/projects/${id}/milestones`, data).then(extractData),
+
+  updateMilestone: (id: number | string, milestoneId: number, data: ProjectMilestoneReq) =>
+    http.patch<ApiResponse<ProjectMilestone>>(`/projects/${id}/milestones/${milestoneId}`, data).then(extractData),
+
+  deleteMilestone: (id: number | string, milestoneId: number) =>
+    http.delete<ApiResponse<null>>(`/projects/${id}/milestones/${milestoneId}`).then(extractData),
+
+  listResources: (id: number | string) =>
+    http.get<ApiResponse<ProjectResource[]>>(`/projects/${id}/resources`).then(extractData),
+
+  createResource: (id: number | string, data: ProjectResourceReq) =>
+    http.post<ApiResponse<ProjectResource>>(`/projects/${id}/resources`, data).then(extractData),
+
+  updateResource: (id: number | string, resourceId: number, data: ProjectResourceReq) =>
+    http.patch<ApiResponse<ProjectResource>>(`/projects/${id}/resources/${resourceId}`, data).then(extractData),
+
+  deleteResource: (id: number | string, resourceId: number) =>
+    http.delete<ApiResponse<null>>(`/projects/${id}/resources/${resourceId}`).then(extractData),
+
+  listRisks: (id: number | string) =>
+    http.get<ApiResponse<ProjectRisk[]>>(`/projects/${id}/risks`).then(extractData),
+
+  createRisk: (id: number | string, data: ProjectRiskReq) =>
+    http.post<ApiResponse<ProjectRisk>>(`/projects/${id}/risks`, data).then(extractData),
+
+  updateRisk: (id: number | string, riskId: number, data: ProjectRiskReq) =>
+    http.patch<ApiResponse<ProjectRisk>>(`/projects/${id}/risks/${riskId}`, data).then(extractData),
+
+  deleteRisk: (id: number | string, riskId: number) =>
+    http.delete<ApiResponse<null>>(`/projects/${id}/risks/${riskId}`).then(extractData),
 
   leaveProject: (id: number | string) =>
     http.delete<ApiResponse<null>>(`/projects/${id}/members/me`).then(extractData),

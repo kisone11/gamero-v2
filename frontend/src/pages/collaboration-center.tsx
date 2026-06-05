@@ -140,7 +140,7 @@ export default function CollaborationCenterPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard icon={Gamepad2} label="参与/创建项目" value={myProjectsQuery.data?.total ?? projects.length} href="/projects?owner=me" />
+        <MetricCard icon={Gamepad2} label="参与/创建项目" value={myProjectsQuery.data?.total ?? projects.length} href="/projects?mine=1" />
         <MetricCard icon={Sparkles} label="我负责的项目" value={ownedProjectsQuery.data?.total ?? ownedProjects.length} href="/projects?owner=me" />
         <MetricCard icon={ClipboardCheck} label="申请处理中" value={pendingApplications} href="/me/applications" />
         <MetricCard icon={Send} label="待处理邀请" value={pendingInvitations} href="/me/invitations" />
@@ -151,7 +151,7 @@ export default function CollaborationCenterPage() {
           title="我的项目"
           empty="还没有参与或创建项目"
           items={projects.slice(0, 5)}
-          action={<Link to="/projects?owner=me" className="text-[12px] text-amber hover:underline">查看全部</Link>}
+          action={<Link to="/projects?mine=1" className="text-[12px] text-amber hover:underline">查看全部</Link>}
           renderItem={(project) => (
             <Link key={project.id} to={`/p/${project.slug || project.id}`} className="block rounded-lg border border-white/[0.04] p-3 hover:border-amber/20 transition-colors">
               <div className="flex items-center justify-between gap-3">

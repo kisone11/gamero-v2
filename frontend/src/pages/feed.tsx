@@ -110,10 +110,10 @@ export default function FeedPage() {
                   onClick={() => setView('my-projects')}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-text-muted hover:text-text-primary hover:bg-white/[0.03] transition-colors group"
                 >
-                  <Gamepad2 className="w-4 h-4 shrink-0 group-hover:text-amber transition-colors" />
+                  <Gamepad2 className="w-4 h-4 shrink-0 text-amber transition-colors" />
                   <div>
-                    <p className="text-[13px] font-medium">我的项目</p>
-                    <p className="text-[11px] text-text-muted">参与和创建的项目</p>
+                    <p className="text-[13px] font-medium text-amber">我的项目</p>
+                    <p className="text-[11px] text-text-muted transition-colors">参与和创建的项目</p>
                   </div>
                 </button>
               )}
@@ -129,7 +129,7 @@ export default function FeedPage() {
               <div className="bg-surface-card border border-white/[0.04] rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <h2 className="text-[16px] font-semibold text-text-primary">我的项目</h2>
-                  <p className="text-[12px] text-text-muted mt-1">只显示你参与或创建的项目</p>
+                  <p className="text-[12px] text-text-muted mt-1">只显示你参与或创建的项目，并标注你的关系</p>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setView('feed')}>返回动态</Button>
               </div>
@@ -150,7 +150,7 @@ export default function FeedPage() {
                   <Link to="/projects/new"><Button variant="primary" size="sm">创建项目</Button></Link>
                 </div>
               ) : (
-                myProjectItems.map((project) => <ProjectCard key={project.id} project={project} />)
+                myProjectItems.map((project) => <ProjectCard key={project.id} project={project} currentUserId={me?.id} />)
               )}
             </div>
           ) : isLoading ? (

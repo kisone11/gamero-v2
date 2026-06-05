@@ -734,6 +734,81 @@ export interface ProjectTaskReq {
   due_date?: string
 }
 
+export type ProjectMilestoneStatus = 'planned' | 'active' | 'done'
+
+export interface ProjectMilestone {
+  id: number
+  project_id: number
+  creator_id: number
+  title: string
+  description?: string
+  status: ProjectMilestoneStatus
+  due_date?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectMilestoneReq {
+  title?: string
+  description?: string
+  status?: ProjectMilestoneStatus
+  due_date?: string
+}
+
+export type ProjectResourceCategory = 'doc' | 'code' | 'build' | 'asset' | 'reference' | 'other'
+
+export interface ProjectResource {
+  id: number
+  project_id: number
+  creator_id: number
+  category: ProjectResourceCategory
+  title: string
+  url: string
+  description?: string
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectResourceReq {
+  title?: string
+  url?: string
+  category?: ProjectResourceCategory
+  description?: string
+  is_pinned?: boolean
+}
+
+export type ProjectRiskCategory = 'tech' | 'schedule' | 'art' | 'team' | 'scope' | 'market' | 'other'
+export type ProjectRiskLevel = 'low' | 'medium' | 'high' | 'critical'
+export type ProjectRiskStatus = 'open' | 'mitigating' | 'resolved'
+
+export interface ProjectRisk {
+  id: number
+  project_id: number
+  creator_id: number
+  category: ProjectRiskCategory
+  level: ProjectRiskLevel
+  status: ProjectRiskStatus
+  title: string
+  description?: string
+  mitigation?: string
+  due_date?: string | null
+  resolved_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectRiskReq {
+  title?: string
+  description?: string
+  mitigation?: string
+  category?: ProjectRiskCategory
+  level?: ProjectRiskLevel
+  status?: ProjectRiskStatus
+  due_date?: string
+}
+
 
 export interface PlatformStats {
   total_users: number

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Gamepad2 } from 'lucide-react'
+import { Crown, Gamepad2, UserCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { ProjectListItem } from '@/types/api'
 
@@ -27,8 +27,13 @@ function projectStatusColor(status: string): string {
   return map[status] ?? 'default'
 }
 
-export function ProjectCard({ project }: { project: ProjectListItem }) {
+export function ProjectCard({ project, currentUserId }: { project: ProjectListItem; currentUserId?: number }) {
   const projectHref = `/p/${project.slug || project.id}`
+  const relation = currentUserId
+    ? project.owner_id === currentUserId
+      ? { label: '我创建/负责', variant: 'success' as const, icon: Crown }
+      : { label: '我参与', variant: 'default' as const, icon: UserCheck }
+    : null
 
   return (
     <Link
@@ -48,6 +53,11 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
               <Badge variant={projectStatusColor(project.status) as any} size="sm" className="shrink-0">
                 {projectStatusLabel(project.status)}
               </Badge>
+              {relation && (
+                <Badge variant={relation.variant} size="sm" className="shrink-0 gap-1">
+                  <relation.icon className="w-3 h-3" />{relation.label}
+                </Badge>
+              )}
             </div>
             {project.description && (
               <p className="text-body text-text-secondary line-clamp-2">{project.description}</p>

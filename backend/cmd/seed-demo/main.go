@@ -82,6 +82,9 @@ func seed(db *gorm.DB) error {
 		if err := seedProjectMembers(tx, users, projects); err != nil {
 			return err
 		}
+		if err := seedProjectResources(tx, projects); err != nil {
+			return err
+		}
 		if err := seedDevLogs(tx, users, projects); err != nil {
 			return err
 		}
@@ -229,6 +232,22 @@ func seedProjectMembers(tx *gorm.DB, users map[string]*model.User, projects map[
 		row := model.ProjectMember{ProjectID: projects[m.Project].ID, UserID: users[m.User].ID, Role: m.Role, Contribution: m.Note, JoinedAt: time.Now().AddDate(0, -1, 0), IsActive: true}
 		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "project_id"}, {Name: "user_id"}}, DoUpdates: clause.AssignmentColumns([]string{"role", "contribution", "is_active", "updated_at"})}).Create(&row).Error; err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func seedProjectResources(tx *gorm.DB, projects map[string]*model.Project) error {
+	for slug, project := range projects {
+		resources := []model.ProjectResource{
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectResourceCategoryDoc, Title: "项目设计文档", URL: fmt.Sprintf("https://example.com/%s/design-doc", slug), Description: "核心玩法、系统结构和版本目标说明。", IsPinned: true},
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectResourceCategoryCode, Title: "代码仓库", URL: fmt.Sprintf("https://github.com/gamero-demo/%s", slug), Description: "项目主仓库和开发分支说明。"},
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectResourceCategoryBuild, Title: "最新试玩包", URL: fmt.Sprintf("https://example.com/%s/latest-build", slug), Description: "供成员测试的最新可运行版本。"},
+		}
+		for _, resource := range resources {
+			if err := tx.Where("project_id = ? AND title = ?", resource.ProjectID, resource.Title).Assign(resource).FirstOrCreate(&model.ProjectResource{}).Error; err != nil {
+				return err
+			}
 		}
 	}
 	return nil

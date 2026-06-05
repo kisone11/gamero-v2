@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Heart, Plus, Gamepad2, TrendingUp, Zap } from 'lucide-react'
+import { Heart, Plus, Gamepad2, TrendingUp, Zap, Crown, UserCheck } from 'lucide-react'
 import { projectApi, type ListProjectsParams } from '@/api/project'
 import { useAuthStore } from '@/stores/authStore'
 import { Badge } from '@/components/ui/badge'
@@ -45,9 +45,14 @@ function ProjectCardSkeleton() {
 // Project Card — matches FeedPage card quality
 // ============================================================
 
-function ProjectCard({ project }: { project: ProjectListItem }) {
+function ProjectCard({ project, currentUserId }: { project: ProjectListItem; currentUserId?: number }) {
   const status = PROJECT_STATUS_CONFIG[project.status]
   const projectHref = `/p/${project.slug || project.id}`
+  const relation = currentUserId
+    ? project.owner_id === currentUserId
+      ? { label: '我创建/负责', variant: 'success' as const, icon: Crown }
+      : { label: '我参与', variant: 'default' as const, icon: UserCheck }
+    : null
 
   return (
     <Link
@@ -75,6 +80,11 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
             </p>
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-2 flex-wrap">
+                {relation && (
+                  <Badge variant={relation.variant} size="sm" className="gap-1">
+                    <relation.icon className="w-3 h-3" />{relation.label}
+                  </Badge>
+                )}
                 <Badge variant="default" size="sm">
                   {GENRE_LABELS[project.genre]}
                 </Badge>
@@ -137,7 +147,9 @@ export default function ProjectsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const user = useAuthStore((s) => s.user)
-  const myProjects = searchParams.get('owner') === 'me'
+  const ownerProjects = searchParams.get('owner') === 'me'
+  const myProjects = searchParams.get('mine') === '1'
+  const scopedProjects = ownerProjects || myProjects
 
   const [genre, setGenre] = useState<ProjectGenre | ''>('')
   const [status, setStatus] = useState<ProjectStatus | ''>('')
@@ -145,17 +157,18 @@ export default function ProjectsPage() {
   const [page, setPage] = useState(1)
 
   const projectsQuery = useQuery({
-    queryKey: ['projects', { genre, status, sort, page, myProjects, userId: user?.id }],
+    queryKey: ['projects', { genre, status, sort, page, ownerProjects, myProjects, userId: user?.id }],
     queryFn: () =>
       projectApi.list({
         page,
         page_size: 12,
         genre: genre || undefined,
         status: status || undefined,
+        owner_id: ownerProjects && user ? user.id : undefined,
         participant_id: myProjects && user ? user.id : undefined,
         sort,
       }),
-    enabled: !myProjects || !!user,
+    enabled: !scopedProjects || !!user,
   })
 
   const projects = projectsQuery.data?.list ?? []
@@ -185,7 +198,7 @@ export default function ProjectsPage() {
     <div className="max-w-[1280px] mx-auto px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-[22px] font-bold text-text-primary">{myProjects ? '我的项目' : '发现项目'}</h1>
+        <h1 className="text-[22px] font-bold text-text-primary">{ownerProjects ? '我负责的项目' : myProjects ? '我的项目' : '发现项目'}</h1>
         {user && (
           <Button size="sm" onClick={() => navigate('/projects/new')}>
             <Plus className="w-3.5 h-3.5" />
@@ -258,7 +271,7 @@ export default function ProjectsPage() {
           </div>
           <p className="text-[15px] font-semibold text-text-secondary mb-1">暂无项目</p>
           <p className="text-[13px] text-text-muted mb-6">
-            {myProjects ? '你还没有参与或创建项目' : user ? '还没有项目，来创建第一个吧' : '登录后即可创建项目'}
+            {ownerProjects ? '你还没有负责的项目' : myProjects ? '你还没有参与或创建项目' : user ? '还没有项目，来创建第一个吧' : '登录后即可创建项目'}
           </p>
           {user ? (
             <Button variant="secondary" size="sm" onClick={() => navigate('/projects/new')}>
@@ -277,7 +290,7 @@ export default function ProjectsPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard key={project.id} project={project} currentUserId={scopedProjects ? user?.id : undefined} />
             ))}
           </div>
           <Pagination page={page} pages={pages} onChange={setPage} />

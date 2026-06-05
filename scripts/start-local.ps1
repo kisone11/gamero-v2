@@ -129,6 +129,15 @@ Start-Sleep -Seconds 5
 
 $ServerExe = Join-Path $Backend "server-local.exe"
 Stop-PortProcess -Name "Backend" -Port 8081
+Write-Host "Migrating database..."
+Push-Location $Backend
+try {
+    go run .\cmd\migrate -config config\config.yaml
+}
+finally {
+    Pop-Location
+}
+
 Write-Host "Building backend..."
 Push-Location $Backend
 try {

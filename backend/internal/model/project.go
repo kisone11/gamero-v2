@@ -93,6 +93,48 @@ const (
 	ProjectTaskPriorityHigh   ProjectTaskPriority = "high"
 )
 
+type ProjectMilestoneStatus string
+
+const (
+	ProjectMilestoneStatusPlanned ProjectMilestoneStatus = "planned"
+	ProjectMilestoneStatusActive  ProjectMilestoneStatus = "active"
+	ProjectMilestoneStatusDone    ProjectMilestoneStatus = "done"
+)
+
+type ProjectResourceCategory string
+
+const (
+	ProjectResourceCategoryDoc       ProjectResourceCategory = "doc"
+	ProjectResourceCategoryCode      ProjectResourceCategory = "code"
+	ProjectResourceCategoryBuild     ProjectResourceCategory = "build"
+	ProjectResourceCategoryAsset     ProjectResourceCategory = "asset"
+	ProjectResourceCategoryReference ProjectResourceCategory = "reference"
+	ProjectResourceCategoryOther     ProjectResourceCategory = "other"
+)
+
+type ProjectRiskCategory string
+type ProjectRiskLevel string
+type ProjectRiskStatus string
+
+const (
+	ProjectRiskCategoryTech     ProjectRiskCategory = "tech"
+	ProjectRiskCategorySchedule ProjectRiskCategory = "schedule"
+	ProjectRiskCategoryArt      ProjectRiskCategory = "art"
+	ProjectRiskCategoryTeam     ProjectRiskCategory = "team"
+	ProjectRiskCategoryScope    ProjectRiskCategory = "scope"
+	ProjectRiskCategoryMarket   ProjectRiskCategory = "market"
+	ProjectRiskCategoryOther    ProjectRiskCategory = "other"
+
+	ProjectRiskLevelLow      ProjectRiskLevel = "low"
+	ProjectRiskLevelMedium   ProjectRiskLevel = "medium"
+	ProjectRiskLevelHigh     ProjectRiskLevel = "high"
+	ProjectRiskLevelCritical ProjectRiskLevel = "critical"
+
+	ProjectRiskStatusOpen       ProjectRiskStatus = "open"
+	ProjectRiskStatusMitigating ProjectRiskStatus = "mitigating"
+	ProjectRiskStatusResolved   ProjectRiskStatus = "resolved"
+)
+
 // TimelineEventType 时间轴事件类型枚举
 type TimelineEventType string
 
@@ -292,6 +334,57 @@ type ProjectTask struct {
 }
 
 func (ProjectTask) TableName() string { return "project_tasks" }
+
+// ProjectMilestone 项目里程碑，用于生产排期和版本目标管理。
+type ProjectMilestone struct {
+	ID          uint64                 `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProjectID   uint64                 `gorm:"not null;index" json:"project_id"`
+	CreatorID   uint64                 `gorm:"not null;index" json:"creator_id"`
+	Title       string                 `gorm:"type:varchar(120);not null" json:"title"`
+	Description string                 `gorm:"type:varchar(1000);default:null" json:"description,omitempty"`
+	Status      ProjectMilestoneStatus `gorm:"type:varchar(16);not null;default:'planned';index" json:"status"`
+	DueDate     *time.Time             `gorm:"type:date;default:null;index" json:"due_date,omitempty"`
+	CompletedAt *time.Time             `gorm:"default:null" json:"completed_at,omitempty"`
+	CreatedAt   time.Time              `gorm:"not null;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time              `gorm:"not null;autoUpdateTime" json:"updated_at"`
+}
+
+func (ProjectMilestone) TableName() string { return "project_milestones" }
+
+// ProjectResource 项目资料库，用于沉淀项目文档、代码仓库、试玩包、素材和参考资料链接。
+type ProjectResource struct {
+	ID          uint64                  `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProjectID   uint64                  `gorm:"not null;index" json:"project_id"`
+	CreatorID   uint64                  `gorm:"not null;index" json:"creator_id"`
+	Category    ProjectResourceCategory `gorm:"type:varchar(24);not null;default:'doc';index" json:"category"`
+	Title       string                  `gorm:"type:varchar(120);not null" json:"title"`
+	URL         string                  `gorm:"type:varchar(1000);not null" json:"url"`
+	Description string                  `gorm:"type:varchar(1000);default:null" json:"description,omitempty"`
+	IsPinned    bool                    `gorm:"not null;default:false;index" json:"is_pinned"`
+	CreatedAt   time.Time               `gorm:"not null;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time               `gorm:"not null;autoUpdateTime" json:"updated_at"`
+}
+
+func (ProjectResource) TableName() string { return "project_resources" }
+
+// ProjectRisk 项目风险雷达，用于跟踪游戏生产中的技术、进度、资源、团队和市场风险。
+type ProjectRisk struct {
+	ID          uint64              `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProjectID   uint64              `gorm:"not null;index" json:"project_id"`
+	CreatorID   uint64              `gorm:"not null;index" json:"creator_id"`
+	Category    ProjectRiskCategory `gorm:"type:varchar(24);not null;default:'tech';index" json:"category"`
+	Level       ProjectRiskLevel    `gorm:"type:varchar(16);not null;default:'medium';index" json:"level"`
+	Status      ProjectRiskStatus   `gorm:"type:varchar(16);not null;default:'open';index" json:"status"`
+	Title       string              `gorm:"type:varchar(120);not null" json:"title"`
+	Description string              `gorm:"type:varchar(1000);default:null" json:"description,omitempty"`
+	Mitigation  string              `gorm:"type:varchar(1000);default:null" json:"mitigation,omitempty"`
+	DueDate     *time.Time          `gorm:"type:date;default:null;index" json:"due_date,omitempty"`
+	ResolvedAt  *time.Time          `gorm:"default:null" json:"resolved_at,omitempty"`
+	CreatedAt   time.Time           `gorm:"not null;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time           `gorm:"not null;autoUpdateTime" json:"updated_at"`
+}
+
+func (ProjectRisk) TableName() string { return "project_risks" }
 
 // TableName 指定表名
 func (ProjectTimeline) TableName() string {

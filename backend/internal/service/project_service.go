@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -126,6 +127,73 @@ type ProjectTaskDetail struct {
 	UpdatedAt        time.Time                 `json:"updated_at"`
 	CreatorNickname  string                    `json:"creator_nickname,omitempty"`
 	AssigneeNickname string                    `json:"assignee_nickname,omitempty"`
+}
+
+type ProjectMilestoneReq struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Status      *string `json:"status"`
+	DueDate     *string `json:"due_date"`
+}
+
+type ProjectMilestoneDetail struct {
+	ID          uint64                       `json:"id"`
+	ProjectID   uint64                       `json:"project_id"`
+	CreatorID   uint64                       `json:"creator_id"`
+	Title       string                       `json:"title"`
+	Description string                       `json:"description,omitempty"`
+	Status      model.ProjectMilestoneStatus `json:"status"`
+	DueDate     *time.Time                   `json:"due_date,omitempty"`
+	CompletedAt *time.Time                   `json:"completed_at,omitempty"`
+	CreatedAt   time.Time                    `json:"created_at"`
+	UpdatedAt   time.Time                    `json:"updated_at"`
+}
+
+type ProjectResourceReq struct {
+	Title       *string `json:"title"`
+	URL         *string `json:"url"`
+	Category    *string `json:"category"`
+	Description *string `json:"description"`
+	IsPinned    *bool   `json:"is_pinned"`
+}
+
+type ProjectResourceDetail struct {
+	ID          uint64                        `json:"id"`
+	ProjectID   uint64                        `json:"project_id"`
+	CreatorID   uint64                        `json:"creator_id"`
+	Category    model.ProjectResourceCategory `json:"category"`
+	Title       string                        `json:"title"`
+	URL         string                        `json:"url"`
+	Description string                        `json:"description,omitempty"`
+	IsPinned    bool                          `json:"is_pinned"`
+	CreatedAt   time.Time                     `json:"created_at"`
+	UpdatedAt   time.Time                     `json:"updated_at"`
+}
+
+type ProjectRiskReq struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Mitigation  *string `json:"mitigation"`
+	Category    *string `json:"category"`
+	Level       *string `json:"level"`
+	Status      *string `json:"status"`
+	DueDate     *string `json:"due_date"`
+}
+
+type ProjectRiskDetail struct {
+	ID          uint64                    `json:"id"`
+	ProjectID   uint64                    `json:"project_id"`
+	CreatorID   uint64                    `json:"creator_id"`
+	Category    model.ProjectRiskCategory `json:"category"`
+	Level       model.ProjectRiskLevel    `json:"level"`
+	Status      model.ProjectRiskStatus   `json:"status"`
+	Title       string                    `json:"title"`
+	Description string                    `json:"description,omitempty"`
+	Mitigation  string                    `json:"mitigation,omitempty"`
+	DueDate     *time.Time                `json:"due_date,omitempty"`
+	ResolvedAt  *time.Time                `json:"resolved_at,omitempty"`
+	CreatedAt   time.Time                 `json:"created_at"`
+	UpdatedAt   time.Time                 `json:"updated_at"`
 }
 
 // MemberDetail 成员详情（含用户基本信息）
@@ -255,6 +323,18 @@ type ProjectService interface {
 	CreateTask(ctx context.Context, userID, projectID uint64, req *ProjectTaskReq) (*ProjectTaskDetail, error)
 	UpdateTask(ctx context.Context, userID, projectID, taskID uint64, req *ProjectTaskReq) (*ProjectTaskDetail, error)
 	DeleteTask(ctx context.Context, userID, projectID, taskID uint64) error
+	ListMilestones(ctx context.Context, userID, projectID uint64) ([]*ProjectMilestoneDetail, error)
+	CreateMilestone(ctx context.Context, userID, projectID uint64, req *ProjectMilestoneReq) (*ProjectMilestoneDetail, error)
+	UpdateMilestone(ctx context.Context, userID, projectID, milestoneID uint64, req *ProjectMilestoneReq) (*ProjectMilestoneDetail, error)
+	DeleteMilestone(ctx context.Context, userID, projectID, milestoneID uint64) error
+	ListResources(ctx context.Context, userID, projectID uint64) ([]*ProjectResourceDetail, error)
+	CreateResource(ctx context.Context, userID, projectID uint64, req *ProjectResourceReq) (*ProjectResourceDetail, error)
+	UpdateResource(ctx context.Context, userID, projectID, resourceID uint64, req *ProjectResourceReq) (*ProjectResourceDetail, error)
+	DeleteResource(ctx context.Context, userID, projectID, resourceID uint64) error
+	ListRisks(ctx context.Context, userID, projectID uint64) ([]*ProjectRiskDetail, error)
+	CreateRisk(ctx context.Context, userID, projectID uint64, req *ProjectRiskReq) (*ProjectRiskDetail, error)
+	UpdateRisk(ctx context.Context, userID, projectID, riskID uint64, req *ProjectRiskReq) (*ProjectRiskDetail, error)
+	DeleteRisk(ctx context.Context, userID, projectID, riskID uint64) error
 
 	// SetDevLogRepository 注入开发日志仓库（可在 NewProjectService 后调用，用于统计版本发布数）
 	SetDevLogRepository(repo repository.DevLogRepository)
@@ -1490,6 +1570,492 @@ func (s *projectService) DeleteTask(ctx context.Context, userID, projectID, task
 		return apperrors.CodeError(apperrors.CodeProjectForbidden)
 	}
 	return s.repo.DeleteTask(ctx, projectID, taskID)
+}
+
+func (s *projectService) milestoneDetail(m *model.ProjectMilestone) *ProjectMilestoneDetail {
+	return &ProjectMilestoneDetail{
+		ID:          m.ID,
+		ProjectID:   m.ProjectID,
+		CreatorID:   m.CreatorID,
+		Title:       m.Title,
+		Description: m.Description,
+		Status:      m.Status,
+		DueDate:     m.DueDate,
+		CompletedAt: m.CompletedAt,
+		CreatedAt:   m.CreatedAt,
+		UpdatedAt:   m.UpdatedAt,
+	}
+}
+
+func validateMilestoneReq(req *ProjectMilestoneReq, creating bool) (map[string]interface{}, error) {
+	updates := map[string]interface{}{}
+	if creating && (req.Title == nil || strings.TrimSpace(*req.Title) == "") {
+		return nil, apperrors.New(apperrors.CodeParamMissing, "里程碑标题不能为空")
+	}
+	if req.Title != nil {
+		title := strings.TrimSpace(*req.Title)
+		if title == "" || len([]rune(title)) > 120 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "里程碑标题长度需为 1-120")
+		}
+		updates["title"] = title
+	}
+	if req.Description != nil {
+		updates["description"] = strings.TrimSpace(*req.Description)
+	}
+	if req.Status != nil {
+		status := model.ProjectMilestoneStatus(*req.Status)
+		switch status {
+		case model.ProjectMilestoneStatusPlanned, model.ProjectMilestoneStatusActive, model.ProjectMilestoneStatusDone:
+			updates["status"] = status
+			if status == model.ProjectMilestoneStatusDone {
+				updates["completed_at"] = time.Now()
+			} else {
+				updates["completed_at"] = nil
+			}
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "里程碑状态无效")
+		}
+	}
+	if req.DueDate != nil {
+		if strings.TrimSpace(*req.DueDate) == "" {
+			updates["due_date"] = nil
+		} else {
+			parsed, err := time.Parse("2006-01-02", *req.DueDate)
+			if err != nil {
+				return nil, apperrors.New(apperrors.CodeParamInvalid, "目标日期格式应为 YYYY-MM-DD")
+			}
+			updates["due_date"] = parsed
+		}
+	}
+	return updates, nil
+}
+
+func (s *projectService) ListMilestones(ctx context.Context, userID, projectID uint64) ([]*ProjectMilestoneDetail, error) {
+	if _, err := s.mustGetProject(ctx, projectID); err != nil {
+		return nil, err
+	}
+	milestones, err := s.repo.ListMilestones(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*ProjectMilestoneDetail, 0, len(milestones))
+	for _, m := range milestones {
+		result = append(result, s.milestoneDetail(m))
+	}
+	return result, nil
+}
+
+func (s *projectService) CreateMilestone(ctx context.Context, userID, projectID uint64, req *ProjectMilestoneReq) (*ProjectMilestoneDetail, error) {
+	if err := s.requireOwner(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	updates, err := validateMilestoneReq(req, true)
+	if err != nil {
+		return nil, err
+	}
+	milestone := &model.ProjectMilestone{ProjectID: projectID, CreatorID: userID, Status: model.ProjectMilestoneStatusPlanned}
+	if v, ok := updates["title"].(string); ok {
+		milestone.Title = v
+	}
+	if v, ok := updates["description"].(string); ok {
+		milestone.Description = v
+	}
+	if v, ok := updates["status"].(model.ProjectMilestoneStatus); ok {
+		milestone.Status = v
+	}
+	if v, ok := updates["due_date"].(time.Time); ok {
+		milestone.DueDate = &v
+	}
+	if milestone.Status == model.ProjectMilestoneStatusDone {
+		now := time.Now()
+		milestone.CompletedAt = &now
+	}
+	if err := s.repo.CreateMilestone(ctx, milestone); err != nil {
+		return nil, err
+	}
+	milestone, err = s.repo.GetMilestoneByID(ctx, projectID, milestone.ID)
+	if err != nil {
+		return nil, err
+	}
+	return s.milestoneDetail(milestone), nil
+}
+
+func (s *projectService) UpdateMilestone(ctx context.Context, userID, projectID, milestoneID uint64, req *ProjectMilestoneReq) (*ProjectMilestoneDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	updates, err := validateMilestoneReq(req, false)
+	if err != nil {
+		return nil, err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner {
+		if len(updates) != 1 {
+			return nil, apperrors.CodeError(apperrors.CodeProjectForbidden)
+		}
+		if _, ok := updates["status"]; !ok {
+			return nil, apperrors.CodeError(apperrors.CodeProjectForbidden)
+		}
+	}
+	if err := s.repo.UpdateMilestone(ctx, projectID, milestoneID, updates); err != nil {
+		return nil, err
+	}
+	milestone, err := s.repo.GetMilestoneByID(ctx, projectID, milestoneID)
+	if err != nil {
+		return nil, err
+	}
+	return s.milestoneDetail(milestone), nil
+}
+
+func (s *projectService) DeleteMilestone(ctx context.Context, userID, projectID, milestoneID uint64) error {
+	if err := s.requireOwner(ctx, projectID, userID); err != nil {
+		return err
+	}
+	return s.repo.DeleteMilestone(ctx, projectID, milestoneID)
+}
+
+func resourceDetail(resource *model.ProjectResource) *ProjectResourceDetail {
+	return &ProjectResourceDetail{
+		ID:          resource.ID,
+		ProjectID:   resource.ProjectID,
+		CreatorID:   resource.CreatorID,
+		Category:    resource.Category,
+		Title:       resource.Title,
+		URL:         resource.URL,
+		Description: resource.Description,
+		IsPinned:    resource.IsPinned,
+		CreatedAt:   resource.CreatedAt,
+		UpdatedAt:   resource.UpdatedAt,
+	}
+}
+
+func validateResourceReq(req *ProjectResourceReq, creating bool) (map[string]interface{}, error) {
+	updates := map[string]interface{}{}
+	if creating && (req.Title == nil || strings.TrimSpace(*req.Title) == "") {
+		return nil, apperrors.New(apperrors.CodeParamMissing, "资料标题不能为空")
+	}
+	if creating && (req.URL == nil || strings.TrimSpace(*req.URL) == "") {
+		return nil, apperrors.New(apperrors.CodeParamMissing, "资料链接不能为空")
+	}
+	if req.Title != nil {
+		title := strings.TrimSpace(*req.Title)
+		if title == "" || len([]rune(title)) > 120 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "资料标题长度需为 1-120")
+		}
+		updates["title"] = title
+	}
+	if req.URL != nil {
+		resourceURL := strings.TrimSpace(*req.URL)
+		parsed, err := url.ParseRequestURI(resourceURL)
+		if resourceURL == "" || err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "资料链接必须是有效的 http/https 地址")
+		}
+		if len(resourceURL) > 1000 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "资料链接过长")
+		}
+		updates["url"] = resourceURL
+	}
+	if req.Category != nil {
+		category := model.ProjectResourceCategory(*req.Category)
+		switch category {
+		case model.ProjectResourceCategoryDoc, model.ProjectResourceCategoryCode, model.ProjectResourceCategoryBuild, model.ProjectResourceCategoryAsset, model.ProjectResourceCategoryReference, model.ProjectResourceCategoryOther:
+			updates["category"] = category
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "资料类型无效")
+		}
+	}
+	if req.Description != nil {
+		description := strings.TrimSpace(*req.Description)
+		if len([]rune(description)) > 1000 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "资料说明不能超过 1000 字")
+		}
+		updates["description"] = description
+	}
+	if req.IsPinned != nil {
+		updates["is_pinned"] = *req.IsPinned
+	}
+	return updates, nil
+}
+
+func (s *projectService) ListResources(ctx context.Context, userID, projectID uint64) ([]*ProjectResourceDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	resources, err := s.repo.ListResources(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*ProjectResourceDetail, 0, len(resources))
+	for _, resource := range resources {
+		result = append(result, resourceDetail(resource))
+	}
+	return result, nil
+}
+
+func (s *projectService) CreateResource(ctx context.Context, userID, projectID uint64, req *ProjectResourceReq) (*ProjectResourceDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	updates, err := validateResourceReq(req, true)
+	if err != nil {
+		return nil, err
+	}
+	resource := &model.ProjectResource{ProjectID: projectID, CreatorID: userID, Category: model.ProjectResourceCategoryDoc}
+	if v, ok := updates["title"].(string); ok {
+		resource.Title = v
+	}
+	if v, ok := updates["url"].(string); ok {
+		resource.URL = v
+	}
+	if v, ok := updates["category"].(model.ProjectResourceCategory); ok {
+		resource.Category = v
+	}
+	if v, ok := updates["description"].(string); ok {
+		resource.Description = v
+	}
+	if v, ok := updates["is_pinned"].(bool); ok {
+		resource.IsPinned = v
+	}
+	if err := s.repo.CreateResource(ctx, resource); err != nil {
+		return nil, err
+	}
+	resource, err = s.repo.GetResourceByID(ctx, projectID, resource.ID)
+	if err != nil {
+		return nil, err
+	}
+	return resourceDetail(resource), nil
+}
+
+func (s *projectService) UpdateResource(ctx context.Context, userID, projectID, resourceID uint64, req *ProjectResourceReq) (*ProjectResourceDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	resource, err := s.repo.GetResourceByID(ctx, projectID, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner && resource.CreatorID != userID {
+		return nil, apperrors.CodeError(apperrors.CodeProjectForbidden)
+	}
+	updates, err := validateResourceReq(req, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpdateResource(ctx, projectID, resourceID, updates); err != nil {
+		return nil, err
+	}
+	resource, err = s.repo.GetResourceByID(ctx, projectID, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	return resourceDetail(resource), nil
+}
+
+func (s *projectService) DeleteResource(ctx context.Context, userID, projectID, resourceID uint64) error {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return err
+	}
+	resource, err := s.repo.GetResourceByID(ctx, projectID, resourceID)
+	if err != nil {
+		return err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner && resource.CreatorID != userID {
+		return apperrors.CodeError(apperrors.CodeProjectForbidden)
+	}
+	return s.repo.DeleteResource(ctx, projectID, resourceID)
+}
+
+func riskDetail(risk *model.ProjectRisk) *ProjectRiskDetail {
+	return &ProjectRiskDetail{ID: risk.ID, ProjectID: risk.ProjectID, CreatorID: risk.CreatorID, Category: risk.Category, Level: risk.Level, Status: risk.Status, Title: risk.Title, Description: risk.Description, Mitigation: risk.Mitigation, DueDate: risk.DueDate, ResolvedAt: risk.ResolvedAt, CreatedAt: risk.CreatedAt, UpdatedAt: risk.UpdatedAt}
+}
+
+func validateRiskReq(req *ProjectRiskReq, creating bool) (map[string]interface{}, error) {
+	updates := map[string]interface{}{}
+	if creating && (req.Title == nil || strings.TrimSpace(*req.Title) == "") {
+		return nil, apperrors.New(apperrors.CodeParamMissing, "风险标题不能为空")
+	}
+	if req.Title != nil {
+		title := strings.TrimSpace(*req.Title)
+		if title == "" || len([]rune(title)) > 120 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "风险标题长度需为 1-120")
+		}
+		updates["title"] = title
+	}
+	if req.Description != nil {
+		description := strings.TrimSpace(*req.Description)
+		if len([]rune(description)) > 1000 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "风险描述不能超过 1000 字")
+		}
+		updates["description"] = description
+	}
+	if req.Mitigation != nil {
+		mitigation := strings.TrimSpace(*req.Mitigation)
+		if len([]rune(mitigation)) > 1000 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "缓解方案不能超过 1000 字")
+		}
+		updates["mitigation"] = mitigation
+	}
+	if req.Category != nil {
+		category := model.ProjectRiskCategory(*req.Category)
+		switch category {
+		case model.ProjectRiskCategoryTech, model.ProjectRiskCategorySchedule, model.ProjectRiskCategoryArt, model.ProjectRiskCategoryTeam, model.ProjectRiskCategoryScope, model.ProjectRiskCategoryMarket, model.ProjectRiskCategoryOther:
+			updates["category"] = category
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "风险类型无效")
+		}
+	}
+	if req.Level != nil {
+		level := model.ProjectRiskLevel(*req.Level)
+		switch level {
+		case model.ProjectRiskLevelLow, model.ProjectRiskLevelMedium, model.ProjectRiskLevelHigh, model.ProjectRiskLevelCritical:
+			updates["level"] = level
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "风险等级无效")
+		}
+	}
+	if req.Status != nil {
+		status := model.ProjectRiskStatus(*req.Status)
+		switch status {
+		case model.ProjectRiskStatusOpen, model.ProjectRiskStatusMitigating, model.ProjectRiskStatusResolved:
+			updates["status"] = status
+			if status == model.ProjectRiskStatusResolved {
+				updates["resolved_at"] = time.Now()
+			} else {
+				updates["resolved_at"] = nil
+			}
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "风险状态无效")
+		}
+	}
+	if req.DueDate != nil {
+		if strings.TrimSpace(*req.DueDate) == "" {
+			updates["due_date"] = nil
+		} else {
+			parsed, err := time.Parse("2006-01-02", *req.DueDate)
+			if err != nil {
+				return nil, apperrors.New(apperrors.CodeParamInvalid, "目标日期格式应为 YYYY-MM-DD")
+			}
+			updates["due_date"] = parsed
+		}
+	}
+	return updates, nil
+}
+
+func (s *projectService) ListRisks(ctx context.Context, userID, projectID uint64) ([]*ProjectRiskDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	risks, err := s.repo.ListRisks(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*ProjectRiskDetail, 0, len(risks))
+	for _, risk := range risks {
+		result = append(result, riskDetail(risk))
+	}
+	return result, nil
+}
+
+func (s *projectService) CreateRisk(ctx context.Context, userID, projectID uint64, req *ProjectRiskReq) (*ProjectRiskDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	updates, err := validateRiskReq(req, true)
+	if err != nil {
+		return nil, err
+	}
+	risk := &model.ProjectRisk{ProjectID: projectID, CreatorID: userID, Category: model.ProjectRiskCategoryTech, Level: model.ProjectRiskLevelMedium, Status: model.ProjectRiskStatusOpen}
+	if v, ok := updates["title"].(string); ok {
+		risk.Title = v
+	}
+	if v, ok := updates["description"].(string); ok {
+		risk.Description = v
+	}
+	if v, ok := updates["mitigation"].(string); ok {
+		risk.Mitigation = v
+	}
+	if v, ok := updates["category"].(model.ProjectRiskCategory); ok {
+		risk.Category = v
+	}
+	if v, ok := updates["level"].(model.ProjectRiskLevel); ok {
+		risk.Level = v
+	}
+	if v, ok := updates["status"].(model.ProjectRiskStatus); ok {
+		risk.Status = v
+	}
+	if v, ok := updates["due_date"].(time.Time); ok {
+		risk.DueDate = &v
+	}
+	if risk.Status == model.ProjectRiskStatusResolved {
+		now := time.Now()
+		risk.ResolvedAt = &now
+	}
+	if err := s.repo.CreateRisk(ctx, risk); err != nil {
+		return nil, err
+	}
+	risk, err = s.repo.GetRiskByID(ctx, projectID, risk.ID)
+	if err != nil {
+		return nil, err
+	}
+	return riskDetail(risk), nil
+}
+
+func (s *projectService) UpdateRisk(ctx context.Context, userID, projectID, riskID uint64, req *ProjectRiskReq) (*ProjectRiskDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	risk, err := s.repo.GetRiskByID(ctx, projectID, riskID)
+	if err != nil {
+		return nil, err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner && risk.CreatorID != userID {
+		return nil, apperrors.CodeError(apperrors.CodeProjectForbidden)
+	}
+	updates, err := validateRiskReq(req, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpdateRisk(ctx, projectID, riskID, updates); err != nil {
+		return nil, err
+	}
+	risk, err = s.repo.GetRiskByID(ctx, projectID, riskID)
+	if err != nil {
+		return nil, err
+	}
+	return riskDetail(risk), nil
+}
+
+func (s *projectService) DeleteRisk(ctx context.Context, userID, projectID, riskID uint64) error {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return err
+	}
+	risk, err := s.repo.GetRiskByID(ctx, projectID, riskID)
+	if err != nil {
+		return err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner && risk.CreatorID != userID {
+		return apperrors.CodeError(apperrors.CodeProjectForbidden)
+	}
+	return s.repo.DeleteRisk(ctx, projectID, riskID)
 }
 
 // indexProject 异步将项目写入 ES 索引（失败不影响主流程）

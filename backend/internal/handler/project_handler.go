@@ -62,6 +62,36 @@ func parseTaskID(c *gin.Context) (uint64, bool) {
 	return id, true
 }
 
+func parseMilestoneID(c *gin.Context) (uint64, bool) {
+	idStr := c.Param("milestoneID")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id == 0 {
+		response.FailBadRequest(c, "无效的里程碑 ID")
+		return 0, false
+	}
+	return id, true
+}
+
+func parseResourceID(c *gin.Context) (uint64, bool) {
+	idStr := c.Param("resourceID")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id == 0 {
+		response.FailBadRequest(c, "无效的资料 ID")
+		return 0, false
+	}
+	return id, true
+}
+
+func parseRiskID(c *gin.Context) (uint64, bool) {
+	idStr := c.Param("riskID")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id == 0 {
+		response.FailBadRequest(c, "无效的风险 ID")
+		return 0, false
+	}
+	return id, true
+}
+
 // ===========================
 // 项目基本操作（需 JWT，且限 owner）
 // ===========================
@@ -172,6 +202,258 @@ func (h *ProjectHandler) DeleteTask(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteTask(c.Request.Context(), userID, projectID, taskID); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *ProjectHandler) ListMilestones(c *gin.Context) {
+	userID, _ := middleware.GetUserID(c)
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	milestones, err := h.svc.ListMilestones(c.Request.Context(), userID, projectID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, milestones)
+}
+
+func (h *ProjectHandler) CreateMilestone(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectMilestoneReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	milestone, err := h.svc.CreateMilestone(c.Request.Context(), userID, projectID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, milestone)
+}
+
+func (h *ProjectHandler) UpdateMilestone(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	milestoneID, ok := parseMilestoneID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectMilestoneReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	milestone, err := h.svc.UpdateMilestone(c.Request.Context(), userID, projectID, milestoneID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, milestone)
+}
+
+func (h *ProjectHandler) DeleteMilestone(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	milestoneID, ok := parseMilestoneID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteMilestone(c.Request.Context(), userID, projectID, milestoneID); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *ProjectHandler) ListResources(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	resources, err := h.svc.ListResources(c.Request.Context(), userID, projectID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, resources)
+}
+
+func (h *ProjectHandler) CreateResource(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectResourceReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	resource, err := h.svc.CreateResource(c.Request.Context(), userID, projectID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, resource)
+}
+
+func (h *ProjectHandler) UpdateResource(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	resourceID, ok := parseResourceID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectResourceReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	resource, err := h.svc.UpdateResource(c.Request.Context(), userID, projectID, resourceID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, resource)
+}
+
+func (h *ProjectHandler) DeleteResource(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	resourceID, ok := parseResourceID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteResource(c.Request.Context(), userID, projectID, resourceID); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *ProjectHandler) ListRisks(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	risks, err := h.svc.ListRisks(c.Request.Context(), userID, projectID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, risks)
+}
+
+func (h *ProjectHandler) CreateRisk(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectRiskReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	risk, err := h.svc.CreateRisk(c.Request.Context(), userID, projectID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, risk)
+}
+
+func (h *ProjectHandler) UpdateRisk(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	riskID, ok := parseRiskID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectRiskReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	risk, err := h.svc.UpdateRisk(c.Request.Context(), userID, projectID, riskID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, risk)
+}
+
+func (h *ProjectHandler) DeleteRisk(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	riskID, ok := parseRiskID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteRisk(c.Request.Context(), userID, projectID, riskID); err != nil {
 		response.Fail(c, err)
 		return
 	}

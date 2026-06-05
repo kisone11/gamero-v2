@@ -39,6 +39,7 @@ func RegisterProjectRoutes(v1 *gin.RouterGroup, deps *Deps) {
 	v1.GET("/projects/:id", middleware.JWTAuthOptional(), h.GetProjectByID)
 	v1.GET("/projects/:id/timeline", h.GetTimeline)
 	v1.GET("/projects/:id/members", h.GetProjectMembers)
+	v1.GET("/projects/:id/milestones", middleware.JWTAuthOptional(), h.ListMilestones)
 
 	// 用户项目列表（公开，可选 JWT）
 	v1.GET("/users/:id/projects", middleware.JWTAuthOptional(), h.GetUserProjects)
@@ -81,6 +82,23 @@ func RegisterProjectRoutes(v1 *gin.RouterGroup, deps *Deps) {
 		g.POST("/:id/tasks", h.CreateTask)
 		g.PATCH("/:id/tasks/:taskID", h.UpdateTask)
 		g.DELETE("/:id/tasks/:taskID", h.DeleteTask)
+
+		// 项目里程碑
+		g.POST("/:id/milestones", h.CreateMilestone)
+		g.PATCH("/:id/milestones/:milestoneID", h.UpdateMilestone)
+		g.DELETE("/:id/milestones/:milestoneID", h.DeleteMilestone)
+
+		// 项目资料库
+		g.GET("/:id/resources", h.ListResources)
+		g.POST("/:id/resources", h.CreateResource)
+		g.PATCH("/:id/resources/:resourceID", h.UpdateResource)
+		g.DELETE("/:id/resources/:resourceID", h.DeleteResource)
+
+		// 项目风险雷达
+		g.GET("/:id/risks", h.ListRisks)
+		g.POST("/:id/risks", h.CreateRisk)
+		g.PATCH("/:id/risks/:riskID", h.UpdateRisk)
+		g.DELETE("/:id/risks/:riskID", h.DeleteRisk)
 
 	}
 

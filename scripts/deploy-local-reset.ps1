@@ -75,6 +75,9 @@ try {
     go run .\cmd\migrate -config config\config.yaml
     go run .\cmd\seed-admin -config config\config.yaml -email admin@gamero.local -password Gamero123 -username admin -nickname Admin
     go run .\cmd\seed-demo -config config\config.yaml
+    go run .\cmd\seed-milestones -config config\config.yaml
+    go run .\cmd\seed-resources -config config\config.yaml
+    go run .\cmd\seed-risks -config config\config.yaml
 } finally {
     Pop-Location
 }
