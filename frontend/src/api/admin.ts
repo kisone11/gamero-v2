@@ -4,6 +4,7 @@ import type {
   PageData,
   PlatformStats,
   DailyStats,
+  AdminDashboardOverview,
   Report,
   AuditLog,
   UserProfileResponse,
@@ -39,6 +40,9 @@ export const adminApi = {
   // ===== 统计数据 =====
   getPlatformStats: () =>
     http.get<ApiResponse<PlatformStats>>('/admin/stats').then(extractData),
+
+  getDashboardOverview: () =>
+    http.get<ApiResponse<AdminDashboardOverview>>('/admin/dashboard').then(extractData),
 
   getDailyStats: (days = 30) =>
     http.get<ApiResponse<DailyStats[]>>('/admin/stats/daily', { params: { days } }).then(extractData),

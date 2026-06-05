@@ -858,6 +858,33 @@ export interface DailyStats {
   new_posts: number
 }
 
+export interface AdminDashboardMetric {
+  key: string
+  label: string
+  value: number
+  severity: 'good' | 'info' | 'warning' | 'danger'
+}
+
+export interface AdminDashboardAction {
+  key: string
+  title: string
+  description: string
+  count: number
+  severity: 'good' | 'info' | 'warning' | 'danger'
+  target_tab: string
+}
+
+export interface AdminDashboardOverview {
+  health_score: number
+  health_level: 'healthy' | 'watch' | 'risk'
+  generated_at: string
+  stats: PlatformStats
+  daily_stats: DailyStats[]
+  risk_metrics: AdminDashboardMetric[]
+  pending_actions: AdminDashboardAction[]
+  recent_audit_logs: AuditLog[]
+}
+
 export interface CreateReportReq {
   target_type: 'post' | 'log' | 'project' | 'comment' | 'user' | 'project_release'
   target_id: number

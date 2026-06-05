@@ -73,20 +73,20 @@ function ProjectWorkspace({
           <Rocket className="w-3.5 h-3.5" />版本发布
         </Link>
         {isOwner ? (
-          <Link to={`/projects/${project.id}/logs/new`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <Link to={`/projects/${project.id}/logs/new`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
             <ScrollText className="w-3.5 h-3.5" />写日志
           </Link>
         ) : (
-          <button onClick={() => onOpenTab('dev-logs')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <button onClick={() => onOpenTab('dev-logs')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
             <ScrollText className="w-3.5 h-3.5" />看日志
           </button>
         )}
         {isOwner ? (
-          <Link to={`/p/${project.slug}/recruit/new`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <Link to={`/p/${project.slug}/recruit/new`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
             <UserPlus className="w-3.5 h-3.5" />发招募
           </Link>
         ) : (
-          <button onClick={() => onOpenTab('recruit')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-text-secondary hover:text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <button onClick={() => onOpenTab('recruit')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
             <UserPlus className="w-3.5 h-3.5" />看招募
           </button>
         )}

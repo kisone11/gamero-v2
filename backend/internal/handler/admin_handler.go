@@ -539,6 +539,15 @@ func (h *AdminHandler) GetPlatformStats(c *gin.Context) {
 	response.Success(c, stats)
 }
 
+func (h *AdminHandler) GetDashboardOverview(c *gin.Context) {
+	overview, err := h.svc.GetDashboardOverview(c.Request.Context())
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, overview)
+}
+
 // GetDailyStats 获取每日数据（用于图表）
 // GET /api/v1/admin/stats/daily?days=30
 func (h *AdminHandler) GetDailyStats(c *gin.Context) {

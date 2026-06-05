@@ -28,24 +28,24 @@ func RegisterAdminRoutes(v1 *gin.RouterGroup, deps *Deps) {
 		// ----- 用户管理 -----
 		admin.GET("/users", adminHandler.ListUsers)
 		admin.GET("/users/:id", adminHandler.GetUser)
-		admin.POST("/users/:id/ban", adminHandler.BanUser)       // PUT → POST
+		admin.POST("/users/:id/ban", adminHandler.BanUser) // PUT → POST
 		admin.POST("/users/batch-ban", adminHandler.BatchBanUsers)
 		admin.DELETE("/users/:id/ban", adminHandler.UnbanUser)
 		admin.DELETE("/users/:id", adminHandler.DeleteUser)
 		admin.GET("/users/export", adminHandler.ExportUsers)
-		admin.PATCH("/users/:id/role",                            // PUT → PATCH
+		admin.PATCH("/users/:id/role", // PUT → PATCH
 			middleware.RequireMinRole(middleware.RoleSuperAdmin),
 			roleHandler.SetUserRole,
 		)
 
 		// ----- 内容审核 -----
 		admin.GET("/reports", adminHandler.ListReports)
-		admin.PATCH("/reports/:id", adminHandler.HandleReport)    // PUT → PATCH
+		admin.PATCH("/reports/:id", adminHandler.HandleReport) // PUT → PATCH
 		admin.GET("/posts", adminHandler.ListPosts)
 		admin.DELETE("/posts/:id", adminHandler.AdminDeletePost)
 		admin.PATCH("/posts/:id/hide", adminHandler.AdminDeletePost) // 新路由(复用 AdminDeletePost)
 		admin.GET("/logs", adminHandler.ListLogs)
-		admin.PATCH("/logs/:id/hide", adminHandler.AdminDeleteLog)   // 管理员强制删除日志
+		admin.PATCH("/logs/:id/hide", adminHandler.AdminDeleteLog) // 管理员强制删除日志
 		admin.DELETE("/comments/:id", adminHandler.AdminDeleteComment)
 		admin.DELETE("/recruitments/:id", adminHandler.AdminCloseRecruitment)
 
@@ -57,6 +57,7 @@ func RegisterAdminRoutes(v1 *gin.RouterGroup, deps *Deps) {
 		admin.PUT("/topics/:id/icon", adminHandler.SaveTopicIcon)
 
 		// ----- 统计数据 -----
+		admin.GET("/dashboard", adminHandler.GetDashboardOverview)
 		admin.GET("/stats", adminHandler.GetPlatformStats)
 		admin.GET("/stats/daily", adminHandler.GetDailyStats)
 

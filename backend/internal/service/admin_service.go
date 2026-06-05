@@ -23,14 +23,13 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // ===========================
 // 请求/响应数据结构
 // ===========================
 
 // AdminUserDetail 用户详情
 type AdminUserDetail struct {
-	User   *model.User   `json:"user"` // 用户基本信息
+	User *model.User `json:"user"` // 用户基本信息
 }
 
 // AdminUserListItem 用户列表项
@@ -54,6 +53,33 @@ type AdminCreateTopicReq struct {
 type AdminUpdateTopicReq struct {
 	Name        *string `json:"name"`        // 话题名称(nil 表示不更新)
 	Description *string `json:"description"` // 话题描述(nil 表示不更新)
+}
+
+type AdminDashboardMetric struct {
+	Key      string `json:"key"`
+	Label    string `json:"label"`
+	Value    int64  `json:"value"`
+	Severity string `json:"severity"`
+}
+
+type AdminDashboardAction struct {
+	Key         string `json:"key"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Count       int64  `json:"count"`
+	Severity    string `json:"severity"`
+	TargetTab   string `json:"target_tab"`
+}
+
+type AdminDashboardOverview struct {
+	HealthScore     int64                     `json:"health_score"`
+	HealthLevel     string                    `json:"health_level"`
+	GeneratedAt     time.Time                 `json:"generated_at"`
+	Stats           *repository.PlatformStats `json:"stats"`
+	DailyStats      []repository.DailyStats   `json:"daily_stats"`
+	RiskMetrics     []AdminDashboardMetric    `json:"risk_metrics"`
+	PendingActions  []AdminDashboardAction    `json:"pending_actions"`
+	RecentAuditLogs []*model.AdminAuditLog    `json:"recent_audit_logs"`
 }
 
 // ===========================
@@ -119,6 +145,8 @@ type AdminService interface {
 	GetPlatformStats(ctx context.Context) (*repository.PlatformStats, error)
 	// GetDailyStats 获取过去 N 天每天的数据
 	GetDailyStats(ctx context.Context, days int) ([]repository.DailyStats, error)
+	// GetDashboardOverview 获取生产运营驾驶舱聚合数据
+	GetDashboardOverview(ctx context.Context) (*AdminDashboardOverview, error)
 
 	// ===== 审计日志 =====
 
@@ -158,12 +186,12 @@ type AdminService interface {
 
 // adminService AdminService 的实现
 type adminService struct {
-	adminRepo     repository.AdminRepository
-	teamRepo      repository.TeamRepository // 用于写通知(CreateNotification 在 TeamRepository 中)
+	adminRepo repository.AdminRepository
+	teamRepo  repository.TeamRepository // 用于写通知(CreateNotification 在 TeamRepository 中)
 	*NotificationClient
-	devLogRepo    repository.DevLogRepository // 开发日志仓库
-	stor          *storage.Client
-	swRepo        repository.SensitiveWordRepository // 敏感词持久化仓库
+	devLogRepo repository.DevLogRepository // 开发日志仓库
+	stor       *storage.Client
+	swRepo     repository.SensitiveWordRepository // 敏感词持久化仓库
 }
 
 // NewAdminService 创建 AdminService 实例
@@ -173,9 +201,9 @@ func NewAdminService(
 	stor *storage.Client,
 ) AdminService {
 	svc := &adminService{
-		adminRepo: adminRepo,
-		teamRepo:  teamRepo,
-		stor:      stor,
+		adminRepo:          adminRepo,
+		teamRepo:           teamRepo,
+		stor:               stor,
 		NotificationClient: &NotificationClient{},
 	}
 	return svc
@@ -190,12 +218,12 @@ func NewAdminServiceFull(
 	stor *storage.Client,
 ) AdminService {
 	return &adminService{
-		adminRepo:  adminRepo,
-		teamRepo:   teamRepo,
-		devLogRepo: devLogRepo,
-		swRepo:     swRepo,
+		adminRepo:          adminRepo,
+		teamRepo:           teamRepo,
+		devLogRepo:         devLogRepo,
+		swRepo:             swRepo,
 		NotificationClient: &NotificationClient{},
-		stor:       stor,
+		stor:               stor,
 	}
 }
 
@@ -381,10 +409,10 @@ func (s *adminService) HandleReport(ctx context.Context, adminID, reportID uint6
 		}
 	}
 	s.Send(ctx, &SendNotificationReq{
-		UserID: report.ReporterID,
-		Type: model.NotificationTypeReportHandled,
-		Title: notifTitle,
-		Content: notifContent,
+		UserID:   report.ReporterID,
+		Type:     model.NotificationTypeReportHandled,
+		Title:    notifTitle,
+		Content:  notifContent,
 		Metadata: map[string]interface{}{"report_id": reportID, "target_type": report.TargetType, "target_id": report.TargetID},
 	})
 
@@ -434,7 +462,7 @@ func (s *adminService) AdminDeleteComment(ctx context.Context, adminID, commentI
 		Action:     "delete_comment",
 		TargetType: commentType + "_comment",
 		TargetID:   commentID,
-		Note:     fmt.Sprintf("删除 %s 评论 %d", commentType, commentID),
+		Note:       fmt.Sprintf("删除 %s 评论 %d", commentType, commentID),
 	}); err != nil {
 		logger.Warn("failed to create audit log", zap.Error(err))
 	}
@@ -565,7 +593,7 @@ func (s *adminService) CreateTopic(ctx context.Context, adminID uint64, req *Adm
 		Action:     "create_topic",
 		TargetType: "topic",
 		TargetID:   topic.ID,
-		Note:     fmt.Sprintf("创建话题「%s」", topic.Name),
+		Note:       fmt.Sprintf("创建话题「%s」", topic.Name),
 	}); err != nil {
 		logger.Warn("failed to create audit log", zap.Error(err))
 	}
@@ -609,7 +637,7 @@ func (s *adminService) UpdateTopic(ctx context.Context, adminID, topicID uint64,
 		Action:     "update_topic",
 		TargetType: "topic",
 		TargetID:   topicID,
-		Note:     fmt.Sprintf("更新话题 %d", topicID),
+		Note:       fmt.Sprintf("更新话题 %d", topicID),
 	}); err != nil {
 		logger.Warn("failed to create audit log", zap.Error(err))
 	}
@@ -632,7 +660,7 @@ func (s *adminService) DeleteTopic(ctx context.Context, adminID, topicID uint64)
 		Action:     "delete_topic",
 		TargetType: "topic",
 		TargetID:   topicID,
-		Note:     fmt.Sprintf("删除话题 %d", topicID),
+		Note:       fmt.Sprintf("删除话题 %d", topicID),
 	}); err != nil {
 		logger.Warn("failed to create audit log", zap.Error(err))
 	}
@@ -667,7 +695,6 @@ func (s *adminService) ListTopics(ctx context.Context) ([]*model.Topic, error) {
 	return topics, nil
 }
 
-
 // ===== 数据统计实现 =====
 
 // GetPlatformStats 获取平台概览统计数据
@@ -692,6 +719,99 @@ func (s *adminService) GetDailyStats(ctx context.Context, days int) ([]repositor
 		return nil, apperrors.WrapMsg(apperrors.CodeInternalError, "获取每日统计数据失败", err)
 	}
 	return result, nil
+}
+
+func (s *adminService) GetDashboardOverview(ctx context.Context) (*AdminDashboardOverview, error) {
+	stats, err := s.adminRepo.GetPlatformStats(ctx)
+	if err != nil {
+		return nil, apperrors.WrapMsg(apperrors.CodeInternalError, "查询平台统计失败", err)
+	}
+	dailyStats, err := s.adminRepo.GetDailyStats(ctx, 7)
+	if err != nil {
+		return nil, apperrors.WrapMsg(apperrors.CodeInternalError, "查询增长趋势失败", err)
+	}
+	auditLogs, _, err := s.adminRepo.ListAuditLogs(ctx, 0, 0, 8)
+	if err != nil {
+		return nil, apperrors.WrapMsg(apperrors.CodeInternalError, "查询审计日志失败", err)
+	}
+
+	db := s.adminRepo.DB().WithContext(ctx)
+	var pendingReports, escalatedReports, bannedUsers, bannedProjects, openRecruitments, pendingApplications int64
+	if err := db.Model(&model.Report{}).Where("status = ?", "pending").Count(&pendingReports).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&model.Report{}).Where("status = ?", "escalated").Count(&escalatedReports).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&model.User{}).Where("deleted_at IS NULL AND is_banned = ?", true).Count(&bannedUsers).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&model.Project{}).Where("deleted_at IS NULL AND is_banned = ?", true).Count(&bannedProjects).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&model.Recruitment{}).Where("status = ? AND expire_at > ?", model.RecruitmentStatusOpen, time.Now()).Count(&openRecruitments).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&model.RecruitmentApplication{}).Where("status = ?", model.ApplicationStatusPending).Count(&pendingApplications).Error; err != nil {
+		return nil, err
+	}
+
+	riskMetrics := []AdminDashboardMetric{
+		{Key: "pending_reports", Label: "待处理举报", Value: pendingReports, Severity: severityByCount(pendingReports, 5, 15)},
+		{Key: "escalated_reports", Label: "升级举报", Value: escalatedReports, Severity: severityByCount(escalatedReports, 1, 5)},
+		{Key: "banned_users", Label: "封禁用户", Value: bannedUsers, Severity: severityByCount(bannedUsers, 10, 50)},
+		{Key: "banned_projects", Label: "下架项目", Value: bannedProjects, Severity: severityByCount(bannedProjects, 3, 10)},
+		{Key: "open_recruitments", Label: "开放招募", Value: openRecruitments, Severity: "good"},
+		{Key: "pending_applications", Label: "待处理申请", Value: pendingApplications, Severity: severityByCount(pendingApplications, 20, 60)},
+	}
+
+	pendingActions := []AdminDashboardAction{
+		{Key: "reports", Title: "处理待审举报", Description: "优先处理违规内容、骚扰、垃圾信息和项目风险举报。", Count: pendingReports + escalatedReports, Severity: severityByCount(pendingReports+escalatedReports, 5, 15), TargetTab: "reports"},
+		{Key: "users", Title: "复核封禁用户", Description: "检查长期封禁、误封申诉和高风险账号。", Count: bannedUsers, Severity: severityByCount(bannedUsers, 10, 50), TargetTab: "users"},
+		{Key: "content", Title: "巡检内容库", Description: "关注近期帖子、日志和项目是否存在敏感或低质内容。", Count: stats.TotalPosts + stats.TotalLogs, Severity: "info", TargetTab: "content"},
+		{Key: "audit", Title: "审计后台操作", Description: "确认管理员敏感操作有记录、备注清晰且可追踪。", Count: int64(len(auditLogs)), Severity: "info", TargetTab: "audit"},
+	}
+
+	healthScore := int64(100)
+	healthScore -= minInt64(pendingReports*2, 30)
+	healthScore -= minInt64(escalatedReports*8, 30)
+	healthScore -= minInt64(bannedProjects*3, 15)
+	healthScore -= minInt64(bannedUsers/2, 10)
+	if healthScore < 0 {
+		healthScore = 0
+	}
+
+	return &AdminDashboardOverview{HealthScore: healthScore, HealthLevel: healthLevel(healthScore), GeneratedAt: time.Now(), Stats: stats, DailyStats: dailyStats, RiskMetrics: riskMetrics, PendingActions: pendingActions, RecentAuditLogs: auditLogs}, nil
+}
+
+func severityByCount(value, warning, danger int64) string {
+	if value >= danger {
+		return "danger"
+	}
+	if value >= warning {
+		return "warning"
+	}
+	if value == 0 {
+		return "good"
+	}
+	return "info"
+}
+
+func healthLevel(score int64) string {
+	if score >= 85 {
+		return "healthy"
+	}
+	if score >= 65 {
+		return "watch"
+	}
+	return "risk"
+}
+
+func minInt64(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // GetAuditLogs 分页查询管理员操作审计日志(已在下方 ===== 审计日志实现 ===== 区域实现)

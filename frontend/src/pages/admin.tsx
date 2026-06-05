@@ -335,7 +335,7 @@ export default function AdminPage() {
         onChange={setTab}
       />
       <div className="mt-6">
-        {tab === 'overview' && <OverviewTab />}
+        {tab === 'overview' && <OverviewTab onOpenTab={setTab} />}
         {tab === 'reports' && <ReportsTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'content' && <ContentTab />}

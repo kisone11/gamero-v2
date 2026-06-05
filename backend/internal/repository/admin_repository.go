@@ -19,11 +19,11 @@ import (
 
 // PlatformStats 平台概览统计数据
 type PlatformStats struct {
-	TotalUsers    int64 `json:"total_users"`    // 总用户数
-	ActiveUsers   int64 `json:"active_users"`   // 活跃用户数（最近30天有活动）
-	TotalProjects int64 `json:"total_projects"` // 总项目数
-	TotalLogs     int64 `json:"total_logs"`     // 总日志数
-	TotalPosts    int64 `json:"total_posts"`    // 总帖子数
+	TotalUsers       int64 `json:"total_users"`        // 总用户数
+	ActiveUsers      int64 `json:"active_users"`       // 活跃用户数（最近30天有活动）
+	TotalProjects    int64 `json:"total_projects"`     // 总项目数
+	TotalLogs        int64 `json:"total_logs"`         // 总日志数
+	TotalPosts       int64 `json:"total_posts"`        // 总帖子数
 	NewUsersToday    int64 `json:"new_users_today"`    // 今日新增用户数
 	NewProjectsToday int64 `json:"new_projects_today"` // 今日新增项目数
 }
@@ -430,11 +430,53 @@ func (r *adminRepository) GetDailyStats(ctx context.Context, days int) ([]DailyS
 		projectCountMap[pc.Date] = pc.Count
 	}
 
+	var logCounts []dailyCount
+	if err := r.db.WithContext(ctx).Model(&model.DevLog{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND deleted_at IS NULL", startDate).
+		Group("DATE(created_at)").
+		Scan(&logCounts).Error; err != nil {
+		return nil, err
+	}
+	logCountMap := make(map[string]int64)
+	for _, lc := range logCounts {
+		logCountMap[lc.Date] = lc.Count
+	}
+
+	var postCounts []dailyCount
+	if err := r.db.WithContext(ctx).Model(&model.Post{}).
+		Select("DATE(created_at) as date, COUNT(*) as count").
+		Where("created_at >= ? AND deleted_at IS NULL", startDate).
+		Group("DATE(created_at)").
+		Scan(&postCounts).Error; err != nil {
+		return nil, err
+	}
+	postCountMap := make(map[string]int64)
+	for _, pc := range postCounts {
+		postCountMap[pc.Date] = pc.Count
+	}
+
+	var activeCounts []dailyCount
+	if err := r.db.WithContext(ctx).Model(&model.User{}).
+		Select("DATE(updated_at) as date, COUNT(*) as count").
+		Where("updated_at >= ? AND deleted_at IS NULL", startDate).
+		Group("DATE(updated_at)").
+		Scan(&activeCounts).Error; err != nil {
+		return nil, err
+	}
+	activeCountMap := make(map[string]int64)
+	for _, ac := range activeCounts {
+		activeCountMap[ac.Date] = ac.Count
+	}
+
 	// 填充结果
 	for i := range result {
 		date := result[i].Date
 		result[i].NewUsers = userCountMap[date]
 		result[i].NewProjects = projectCountMap[date]
+		result[i].NewLogs = logCountMap[date]
+		result[i].NewPosts = postCountMap[date]
+		result[i].ActiveUsers = activeCountMap[date]
 	}
 
 	return result, nil
