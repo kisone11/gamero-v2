@@ -85,6 +85,9 @@ func seed(db *gorm.DB) error {
 		if err := seedProjectResources(tx, projects); err != nil {
 			return err
 		}
+		if err := seedProjectQAItems(tx, projects); err != nil {
+			return err
+		}
 		if err := seedDevLogs(tx, users, projects); err != nil {
 			return err
 		}
@@ -246,6 +249,24 @@ func seedProjectResources(tx *gorm.DB, projects map[string]*model.Project) error
 		}
 		for _, resource := range resources {
 			if err := tx.Where("project_id = ? AND title = ?", resource.ProjectID, resource.Title).Assign(resource).FirstOrCreate(&model.ProjectResource{}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func seedProjectQAItems(tx *gorm.DB, projects map[string]*model.Project) error {
+	for slug, project := range projects {
+		items := []model.ProjectQACheckItem{
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectQACategoryGameplay, Status: model.ProjectQAStatusPassed, Title: "核心玩法闭环可完成", Description: "从开始到结算的最短流程可稳定完成。", EvidenceURL: fmt.Sprintf("https://example.com/%s/qa/gameplay", slug), IsRequired: true},
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectQACategoryPerformance, Status: model.ProjectQAStatusPending, Title: "目标设备性能压测", Description: "低配设备 30 分钟游玩无崩溃，帧率达到项目目标。", Note: "需要补充 Android 低端机数据。", IsRequired: true},
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectQACategoryBug, Status: model.ProjectQAStatusBlocked, Title: "P0/P1 Bug 清零", Description: "发布候选版本不得存在 P0/P1 未关闭问题。", Note: "当前仍有一个存档回滚问题待验证。", IsRequired: true},
+			{ProjectID: project.ID, CreatorID: project.OwnerID, Category: model.ProjectQACategoryStore, Status: model.ProjectQAStatusPending, Title: "商店页素材与描述确认", Description: "截图、封面、简介、标签、年龄分级信息完成最终确认。", IsRequired: true},
+		}
+		for i := range items {
+			item := items[i]
+			if err := tx.Where("project_id = ? AND title = ?", item.ProjectID, item.Title).Assign(item).FirstOrCreate(&item).Error; err != nil {
 				return err
 			}
 		}

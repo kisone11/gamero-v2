@@ -196,6 +196,32 @@ type ProjectRiskDetail struct {
 	UpdatedAt   time.Time                 `json:"updated_at"`
 }
 
+type ProjectQAItemReq struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	EvidenceURL *string `json:"evidence_url"`
+	Note        *string `json:"note"`
+	Category    *string `json:"category"`
+	Status      *string `json:"status"`
+	IsRequired  *bool   `json:"is_required"`
+}
+
+type ProjectQAItemDetail struct {
+	ID          uint64                  `json:"id"`
+	ProjectID   uint64                  `json:"project_id"`
+	CreatorID   uint64                  `json:"creator_id"`
+	Category    model.ProjectQACategory `json:"category"`
+	Status      model.ProjectQAStatus   `json:"status"`
+	Title       string                  `json:"title"`
+	Description string                  `json:"description,omitempty"`
+	EvidenceURL string                  `json:"evidence_url,omitempty"`
+	Note        string                  `json:"note,omitempty"`
+	IsRequired  bool                    `json:"is_required"`
+	CheckedAt   *time.Time              `json:"checked_at,omitempty"`
+	CreatedAt   time.Time               `json:"created_at"`
+	UpdatedAt   time.Time               `json:"updated_at"`
+}
+
 // MemberDetail 成员详情（含用户基本信息）
 type MemberDetail struct {
 	ID           uint64                  `json:"id"`
@@ -335,6 +361,10 @@ type ProjectService interface {
 	CreateRisk(ctx context.Context, userID, projectID uint64, req *ProjectRiskReq) (*ProjectRiskDetail, error)
 	UpdateRisk(ctx context.Context, userID, projectID, riskID uint64, req *ProjectRiskReq) (*ProjectRiskDetail, error)
 	DeleteRisk(ctx context.Context, userID, projectID, riskID uint64) error
+	ListQAItems(ctx context.Context, userID, projectID uint64) ([]*ProjectQAItemDetail, error)
+	CreateQAItem(ctx context.Context, userID, projectID uint64, req *ProjectQAItemReq) (*ProjectQAItemDetail, error)
+	UpdateQAItem(ctx context.Context, userID, projectID, itemID uint64, req *ProjectQAItemReq) (*ProjectQAItemDetail, error)
+	DeleteQAItem(ctx context.Context, userID, projectID, itemID uint64) error
 
 	// SetDevLogRepository 注入开发日志仓库（可在 NewProjectService 后调用，用于统计版本发布数）
 	SetDevLogRepository(repo repository.DevLogRepository)
@@ -2056,6 +2086,183 @@ func (s *projectService) DeleteRisk(ctx context.Context, userID, projectID, risk
 		return apperrors.CodeError(apperrors.CodeProjectForbidden)
 	}
 	return s.repo.DeleteRisk(ctx, projectID, riskID)
+}
+
+func qaItemDetail(item *model.ProjectQACheckItem) *ProjectQAItemDetail {
+	return &ProjectQAItemDetail{ID: item.ID, ProjectID: item.ProjectID, CreatorID: item.CreatorID, Category: item.Category, Status: item.Status, Title: item.Title, Description: item.Description, EvidenceURL: item.EvidenceURL, Note: item.Note, IsRequired: item.IsRequired, CheckedAt: item.CheckedAt, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt}
+}
+
+func validateQAItemReq(req *ProjectQAItemReq, creating bool) (map[string]interface{}, error) {
+	updates := map[string]interface{}{}
+	if creating && (req.Title == nil || strings.TrimSpace(*req.Title) == "") {
+		return nil, apperrors.New(apperrors.CodeParamMissing, "验收项标题不能为空")
+	}
+	if req.Title != nil {
+		title := strings.TrimSpace(*req.Title)
+		if title == "" || len([]rune(title)) > 120 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "验收项标题长度需为 1-120")
+		}
+		updates["title"] = title
+	}
+	if req.Description != nil {
+		description := strings.TrimSpace(*req.Description)
+		if len([]rune(description)) > 1000 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "验收说明不能超过 1000 字")
+		}
+		updates["description"] = description
+	}
+	if req.Note != nil {
+		note := strings.TrimSpace(*req.Note)
+		if len([]rune(note)) > 1000 {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "验收备注不能超过 1000 字")
+		}
+		updates["note"] = note
+	}
+	if req.EvidenceURL != nil {
+		evidenceURL := strings.TrimSpace(*req.EvidenceURL)
+		if evidenceURL == "" {
+			updates["evidence_url"] = ""
+		} else {
+			parsed, err := url.ParseRequestURI(evidenceURL)
+			if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || len(evidenceURL) > 1000 {
+				return nil, apperrors.New(apperrors.CodeParamInvalid, "证据链接必须是有效的 http/https 地址")
+			}
+			updates["evidence_url"] = evidenceURL
+		}
+	}
+	if req.Category != nil {
+		category := model.ProjectQACategory(*req.Category)
+		switch category {
+		case model.ProjectQACategoryGameplay, model.ProjectQACategoryArt, model.ProjectQACategoryAudio, model.ProjectQACategoryPerformance, model.ProjectQACategoryBug, model.ProjectQACategoryStore, model.ProjectQACategoryCompliance, model.ProjectQACategoryOther:
+			updates["category"] = category
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "验收类型无效")
+		}
+	}
+	if req.Status != nil {
+		status := model.ProjectQAStatus(*req.Status)
+		switch status {
+		case model.ProjectQAStatusPending, model.ProjectQAStatusPassed, model.ProjectQAStatusFailed, model.ProjectQAStatusBlocked:
+			updates["status"] = status
+			if status == model.ProjectQAStatusPending {
+				updates["checked_at"] = nil
+			} else {
+				updates["checked_at"] = time.Now()
+			}
+		default:
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "验收状态无效")
+		}
+	}
+	if req.IsRequired != nil {
+		updates["is_required"] = *req.IsRequired
+	}
+	return updates, nil
+}
+
+func (s *projectService) ListQAItems(ctx context.Context, userID, projectID uint64) ([]*ProjectQAItemDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	items, err := s.repo.ListQAItems(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*ProjectQAItemDetail, 0, len(items))
+	for _, item := range items {
+		result = append(result, qaItemDetail(item))
+	}
+	return result, nil
+}
+
+func (s *projectService) CreateQAItem(ctx context.Context, userID, projectID uint64, req *ProjectQAItemReq) (*ProjectQAItemDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	updates, err := validateQAItemReq(req, true)
+	if err != nil {
+		return nil, err
+	}
+	item := &model.ProjectQACheckItem{ProjectID: projectID, CreatorID: userID, Category: model.ProjectQACategoryGameplay, Status: model.ProjectQAStatusPending, IsRequired: true}
+	if v, ok := updates["title"].(string); ok {
+		item.Title = v
+	}
+	if v, ok := updates["description"].(string); ok {
+		item.Description = v
+	}
+	if v, ok := updates["evidence_url"].(string); ok {
+		item.EvidenceURL = v
+	}
+	if v, ok := updates["note"].(string); ok {
+		item.Note = v
+	}
+	if v, ok := updates["category"].(model.ProjectQACategory); ok {
+		item.Category = v
+	}
+	if v, ok := updates["status"].(model.ProjectQAStatus); ok {
+		item.Status = v
+	}
+	if v, ok := updates["is_required"].(bool); ok {
+		item.IsRequired = v
+	}
+	if item.Status != model.ProjectQAStatusPending {
+		now := time.Now()
+		item.CheckedAt = &now
+	}
+	if err := s.repo.CreateQAItem(ctx, item); err != nil {
+		return nil, err
+	}
+	item, err = s.repo.GetQAItemByID(ctx, projectID, item.ID)
+	if err != nil {
+		return nil, err
+	}
+	return qaItemDetail(item), nil
+}
+
+func (s *projectService) UpdateQAItem(ctx context.Context, userID, projectID, itemID uint64, req *ProjectQAItemReq) (*ProjectQAItemDetail, error) {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return nil, err
+	}
+	item, err := s.repo.GetQAItemByID(ctx, projectID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner && item.CreatorID != userID {
+		return nil, apperrors.CodeError(apperrors.CodeProjectForbidden)
+	}
+	updates, err := validateQAItemReq(req, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpdateQAItem(ctx, projectID, itemID, updates); err != nil {
+		return nil, err
+	}
+	item, err = s.repo.GetQAItemByID(ctx, projectID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	return qaItemDetail(item), nil
+}
+
+func (s *projectService) DeleteQAItem(ctx context.Context, userID, projectID, itemID uint64) error {
+	if err := s.requireProjectMember(ctx, projectID, userID); err != nil {
+		return err
+	}
+	item, err := s.repo.GetQAItemByID(ctx, projectID, itemID)
+	if err != nil {
+		return err
+	}
+	isOwner, err := s.repo.IsOwner(ctx, projectID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner && item.CreatorID != userID {
+		return apperrors.CodeError(apperrors.CodeProjectForbidden)
+	}
+	return s.repo.DeleteQAItem(ctx, projectID, itemID)
 }
 
 // indexProject 异步将项目写入 ES 索引（失败不影响主流程）

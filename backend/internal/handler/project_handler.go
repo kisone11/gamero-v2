@@ -92,6 +92,16 @@ func parseRiskID(c *gin.Context) (uint64, bool) {
 	return id, true
 }
 
+func parseQAItemID(c *gin.Context) (uint64, bool) {
+	idStr := c.Param("qaItemID")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id == 0 {
+		response.FailBadRequest(c, "无效的验收项 ID")
+		return 0, false
+	}
+	return id, true
+}
+
 // ===========================
 // 项目基本操作（需 JWT，且限 owner）
 // ===========================
@@ -454,6 +464,91 @@ func (h *ProjectHandler) DeleteRisk(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteRisk(c.Request.Context(), userID, projectID, riskID); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *ProjectHandler) ListQAItems(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	items, err := h.svc.ListQAItems(c.Request.Context(), userID, projectID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, items)
+}
+
+func (h *ProjectHandler) CreateQAItem(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectQAItemReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	item, err := h.svc.CreateQAItem(c.Request.Context(), userID, projectID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
+func (h *ProjectHandler) UpdateQAItem(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	itemID, ok := parseQAItemID(c)
+	if !ok {
+		return
+	}
+	var req service.ProjectQAItemReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.FailBadRequest(c, "请求参数错误："+err.Error())
+		return
+	}
+	item, err := h.svc.UpdateQAItem(c.Request.Context(), userID, projectID, itemID, &req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.Success(c, item)
+}
+
+func (h *ProjectHandler) DeleteQAItem(c *gin.Context) {
+	userID, ok := requireLogin(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseProjectID(c)
+	if !ok {
+		return
+	}
+	itemID, ok := parseQAItemID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteQAItem(c.Request.Context(), userID, projectID, itemID); err != nil {
 		response.Fail(c, err)
 		return
 	}

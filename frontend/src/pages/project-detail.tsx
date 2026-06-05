@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Search, Plus, LayoutDashboard, Users, ClipboardList, ScrollText, Rocket, UserPlus, Flag, Archive, Radar } from 'lucide-react'
+import { AlertTriangle, Search, Plus, LayoutDashboard, Users, ClipboardList, ScrollText, Rocket, UserPlus, Flag, Archive, Radar, ClipboardCheck } from 'lucide-react'
 import { projectApi } from '@/api/project'
 import { recruitApi } from '@/api/recruit'
 import { RecruitCard } from '@/components/recruit/RecruitCard'
@@ -12,7 +12,7 @@ import { toast } from '@/stores/toastStore'
 import {
   HeroSection, ProjectSidebar, ProjectOverviewTab,
   ProjectLogsTab, ProjectMembersTab, ProjectReviewsTab, ProjectTasksTab,
-  ProjectMilestonesTab, ProjectResourcesTab, ProjectRiskRadarTab,
+  ProjectMilestonesTab, ProjectResourcesTab, ProjectRiskRadarTab, ProjectQAGateTab,
 } from '@/components/project'
 import type { ProjectDetail } from '@/types/api'
 
@@ -24,6 +24,7 @@ const TABS = [
   { value: 'milestones', label: '里程碑' },
   { value: 'resources', label: '资料库' },
   { value: 'risks', label: '风险雷达' },
+  { value: 'qa-gate', label: '上线验收' },
   { value: 'recruit', label: '招募' },
   { value: 'reviews', label: '评测' },
 ]
@@ -49,7 +50,7 @@ function ProjectWorkspace({
           <p className="text-[12px] text-text-muted">集中处理任务、成员、版本、日志和招募，不影响下方原有详情内容。</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-2">
         <button onClick={() => onOpenTab('tasks')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
           <ClipboardList className="w-3.5 h-3.5" />任务看板
         </button>
@@ -64,6 +65,9 @@ function ProjectWorkspace({
         </button>
         <button onClick={() => onOpenTab('risks')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
           <Radar className="w-3.5 h-3.5" />风险雷达
+        </button>
+        <button onClick={() => onOpenTab('qa-gate')} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
+          <ClipboardCheck className="w-3.5 h-3.5" />上线验收
         </button>
         <Link to={`/project/${project.id}/releases`} className="flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] px-3 py-2 text-[12px] text-amber hover:border-amber/20 hover:bg-amber/[0.04] transition-colors">
           <Rocket className="w-3.5 h-3.5" />版本发布
@@ -295,6 +299,7 @@ export default function ProjectDetailPage() {
             {tab === 'milestones' && <ProjectMilestonesTab projectId={project.id} isOwner={isOwner} />}
             {tab === 'resources' && <ProjectResourcesTab projectId={project.id} isOwner={isOwner} currentUserId={user?.id} />}
             {tab === 'risks' && <ProjectRiskRadarTab projectId={project.id} isOwner={isOwner} currentUserId={user?.id} />}
+            {tab === 'qa-gate' && <ProjectQAGateTab projectId={project.id} isOwner={isOwner} currentUserId={user?.id} />}
             {tab === 'recruit' && <RecruitTab project={project} isOwner={isOwner} />}
             {tab === 'reviews' && (
               <ProjectReviewsTab

@@ -9,6 +9,8 @@ import type {
   ProjectResourceReq,
   ProjectRisk,
   ProjectRiskReq,
+  ProjectQAItem,
+  ProjectQAItemReq,
   ProjectTask,
   ProjectTaskReq,
   ProjectListItem,
@@ -154,6 +156,18 @@ export const projectApi = {
 
   deleteRisk: (id: number | string, riskId: number) =>
     http.delete<ApiResponse<null>>(`/projects/${id}/risks/${riskId}`).then(extractData),
+
+  listQAItems: (id: number | string) =>
+    http.get<ApiResponse<ProjectQAItem[]>>(`/projects/${id}/qa-items`).then(extractData),
+
+  createQAItem: (id: number | string, data: ProjectQAItemReq) =>
+    http.post<ApiResponse<ProjectQAItem>>(`/projects/${id}/qa-items`, data).then(extractData),
+
+  updateQAItem: (id: number | string, itemId: number, data: ProjectQAItemReq) =>
+    http.patch<ApiResponse<ProjectQAItem>>(`/projects/${id}/qa-items/${itemId}`, data).then(extractData),
+
+  deleteQAItem: (id: number | string, itemId: number) =>
+    http.delete<ApiResponse<null>>(`/projects/${id}/qa-items/${itemId}`).then(extractData),
 
   leaveProject: (id: number | string) =>
     http.delete<ApiResponse<null>>(`/projects/${id}/members/me`).then(extractData),

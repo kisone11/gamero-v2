@@ -78,6 +78,7 @@ try {
     go run .\cmd\seed-milestones -config config\config.yaml
     go run .\cmd\seed-resources -config config\config.yaml
     go run .\cmd\seed-risks -config config\config.yaml
+    go run .\cmd\seed-qa -config config\config.yaml
 } finally {
     Pop-Location
 }

@@ -809,6 +809,35 @@ export interface ProjectRiskReq {
   due_date?: string
 }
 
+export type ProjectQACategory = 'gameplay' | 'art' | 'audio' | 'performance' | 'bug' | 'store' | 'compliance' | 'other'
+export type ProjectQAStatus = 'pending' | 'passed' | 'failed' | 'blocked'
+
+export interface ProjectQAItem {
+  id: number
+  project_id: number
+  creator_id: number
+  category: ProjectQACategory
+  status: ProjectQAStatus
+  title: string
+  description?: string
+  evidence_url?: string
+  note?: string
+  is_required: boolean
+  checked_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectQAItemReq {
+  title?: string
+  description?: string
+  evidence_url?: string
+  note?: string
+  category?: ProjectQACategory
+  status?: ProjectQAStatus
+  is_required?: boolean
+}
+
 
 export interface PlatformStats {
   total_users: number

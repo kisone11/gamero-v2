@@ -128,6 +128,11 @@ type ProjectRepository interface {
 	GetRiskByID(ctx context.Context, projectID, riskID uint64) (*model.ProjectRisk, error)
 	UpdateRisk(ctx context.Context, projectID, riskID uint64, updates map[string]interface{}) error
 	DeleteRisk(ctx context.Context, projectID, riskID uint64) error
+	ListQAItems(ctx context.Context, projectID uint64) ([]*model.ProjectQACheckItem, error)
+	CreateQAItem(ctx context.Context, item *model.ProjectQACheckItem) error
+	GetQAItemByID(ctx context.Context, projectID, itemID uint64) (*model.ProjectQACheckItem, error)
+	UpdateQAItem(ctx context.Context, projectID, itemID uint64, updates map[string]interface{}) error
+	DeleteQAItem(ctx context.Context, projectID, itemID uint64) error
 }
 
 // ListProjectsParams 项目列表查询参数
@@ -1114,5 +1119,70 @@ func (r *projectRepository) DeleteRisk(ctx context.Context, projectID, riskID ui
 func isMissingRiskTable(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "project_risks") && (strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "42p01") || strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist"))
+}
+
+func (r *projectRepository) ListQAItems(ctx context.Context, projectID uint64) ([]*model.ProjectQACheckItem, error) {
+	var items []*model.ProjectQACheckItem
+	if err := r.db.WithContext(ctx).
+		Where("project_id = ?", projectID).
+		Order("is_required DESC, CASE status WHEN 'blocked' THEN 1 WHEN 'failed' THEN 2 WHEN 'pending' THEN 3 ELSE 4 END, category ASC, updated_at DESC").
+		Find(&items).Error; err != nil {
+		if isMissingQATable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "项目 QA 验收表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询 QA 验收项失败: %w", err)
+	}
+	return items, nil
+}
+
+func (r *projectRepository) CreateQAItem(ctx context.Context, item *model.ProjectQACheckItem) error {
+	if err := r.db.WithContext(ctx).Create(item).Error; err != nil {
+		if isMissingQATable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目 QA 验收表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("创建 QA 验收项失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) GetQAItemByID(ctx context.Context, projectID, itemID uint64) (*model.ProjectQACheckItem, error) {
+	var item model.ProjectQACheckItem
+	err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, itemID).First(&item).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.CodeError(apperrors.CodeNotFound)
+		}
+		if isMissingQATable(err) {
+			return nil, apperrors.New(apperrors.CodeInternalError, "项目 QA 验收表未创建，请先执行数据库迁移")
+		}
+		return nil, fmt.Errorf("查询 QA 验收项失败: %w", err)
+	}
+	return &item, nil
+}
+
+func (r *projectRepository) UpdateQAItem(ctx context.Context, projectID, itemID uint64, updates map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&model.ProjectQACheckItem{}).Where("project_id = ? AND id = ?", projectID, itemID).Updates(updates).Error; err != nil {
+		if isMissingQATable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目 QA 验收表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("更新 QA 验收项失败: %w", err)
+	}
+	return nil
+}
+
+func (r *projectRepository) DeleteQAItem(ctx context.Context, projectID, itemID uint64) error {
+	if err := r.db.WithContext(ctx).Where("project_id = ? AND id = ?", projectID, itemID).Delete(&model.ProjectQACheckItem{}).Error; err != nil {
+		if isMissingQATable(err) {
+			return apperrors.New(apperrors.CodeInternalError, "项目 QA 验收表未创建，请先执行数据库迁移")
+		}
+		return fmt.Errorf("删除 QA 验收项失败: %w", err)
+	}
+	return nil
+}
+
+func isMissingQATable(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "project_qa_check_items") && (strings.Contains(msg, "does not exist") ||
 		strings.Contains(msg, "42p01") || strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist"))
 }

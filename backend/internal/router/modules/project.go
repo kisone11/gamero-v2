@@ -100,6 +100,12 @@ func RegisterProjectRoutes(v1 *gin.RouterGroup, deps *Deps) {
 		g.PATCH("/:id/risks/:riskID", h.UpdateRisk)
 		g.DELETE("/:id/risks/:riskID", h.DeleteRisk)
 
+		// 项目上线验收清单
+		g.GET("/:id/qa-items", h.ListQAItems)
+		g.POST("/:id/qa-items", h.CreateQAItem)
+		g.PATCH("/:id/qa-items/:qaItemID", h.UpdateQAItem)
+		g.DELETE("/:id/qa-items/:qaItemID", h.DeleteQAItem)
+
 	}
 
 	// 我收藏的项目（需 JWT）

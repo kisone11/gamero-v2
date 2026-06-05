@@ -59,13 +59,14 @@ func main() {
 		&model.Portfolio{},  // 用户作品集表
 		&model.UserFollow{}, // 用户关注关系表
 		// 项目系统
-		&model.Project{},          // 游戏项目主表
-		&model.ProjectMember{},    // 项目成员表
-		&model.ProjectTimeline{},  // 项目时间轴表
-		&model.ProjectTask{},      // 项目任务表
-		&model.ProjectMilestone{}, // 项目里程碑表
-		&model.ProjectResource{},  // 项目资料库表
-		&model.ProjectRisk{},      // 项目风险雷达表
+		&model.Project{},            // 游戏项目主表
+		&model.ProjectMember{},      // 项目成员表
+		&model.ProjectTimeline{},    // 项目时间轴表
+		&model.ProjectTask{},        // 项目任务表
+		&model.ProjectMilestone{},   // 项目里程碑表
+		&model.ProjectResource{},    // 项目资料库表
+		&model.ProjectRisk{},        // 项目风险雷达表
+		&model.ProjectQACheckItem{}, // 项目 QA 验收清单表
 		&model.ProjectCollect{},
 		&model.GameReview{},
 		&model.GameReviewLike{},
@@ -121,6 +122,7 @@ func main() {
 			model.ProjectMilestone{}.TableName(),
 			model.ProjectResource{}.TableName(),
 			model.ProjectRisk{}.TableName(),
+			model.ProjectQACheckItem{}.TableName(),
 			// 组队系统
 			model.Recruitment{}.TableName(),
 			model.RecruitmentApplication{}.TableName(),

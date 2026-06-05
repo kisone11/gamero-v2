@@ -115,6 +115,8 @@ const (
 type ProjectRiskCategory string
 type ProjectRiskLevel string
 type ProjectRiskStatus string
+type ProjectQACategory string
+type ProjectQAStatus string
 
 const (
 	ProjectRiskCategoryTech     ProjectRiskCategory = "tech"
@@ -133,6 +135,20 @@ const (
 	ProjectRiskStatusOpen       ProjectRiskStatus = "open"
 	ProjectRiskStatusMitigating ProjectRiskStatus = "mitigating"
 	ProjectRiskStatusResolved   ProjectRiskStatus = "resolved"
+
+	ProjectQACategoryGameplay    ProjectQACategory = "gameplay"
+	ProjectQACategoryArt         ProjectQACategory = "art"
+	ProjectQACategoryAudio       ProjectQACategory = "audio"
+	ProjectQACategoryPerformance ProjectQACategory = "performance"
+	ProjectQACategoryBug         ProjectQACategory = "bug"
+	ProjectQACategoryStore       ProjectQACategory = "store"
+	ProjectQACategoryCompliance  ProjectQACategory = "compliance"
+	ProjectQACategoryOther       ProjectQACategory = "other"
+
+	ProjectQAStatusPending ProjectQAStatus = "pending"
+	ProjectQAStatusPassed  ProjectQAStatus = "passed"
+	ProjectQAStatusFailed  ProjectQAStatus = "failed"
+	ProjectQAStatusBlocked ProjectQAStatus = "blocked"
 )
 
 // TimelineEventType 时间轴事件类型枚举
@@ -385,6 +401,25 @@ type ProjectRisk struct {
 }
 
 func (ProjectRisk) TableName() string { return "project_risks" }
+
+// ProjectQACheckItem 项目上线验收清单，用于发布前 QA Gate 管理。
+type ProjectQACheckItem struct {
+	ID          uint64            `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProjectID   uint64            `gorm:"not null;index" json:"project_id"`
+	CreatorID   uint64            `gorm:"not null;index" json:"creator_id"`
+	Category    ProjectQACategory `gorm:"type:varchar(24);not null;default:'gameplay';index" json:"category"`
+	Status      ProjectQAStatus   `gorm:"type:varchar(16);not null;default:'pending';index" json:"status"`
+	Title       string            `gorm:"type:varchar(120);not null" json:"title"`
+	Description string            `gorm:"type:varchar(1000);default:null" json:"description,omitempty"`
+	EvidenceURL string            `gorm:"type:varchar(1000);default:null" json:"evidence_url,omitempty"`
+	Note        string            `gorm:"type:varchar(1000);default:null" json:"note,omitempty"`
+	IsRequired  bool              `gorm:"not null;default:true;index" json:"is_required"`
+	CheckedAt   *time.Time        `gorm:"default:null" json:"checked_at,omitempty"`
+	CreatedAt   time.Time         `gorm:"not null;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time         `gorm:"not null;autoUpdateTime" json:"updated_at"`
+}
+
+func (ProjectQACheckItem) TableName() string { return "project_qa_check_items" }
 
 // TableName 指定表名
 func (ProjectTimeline) TableName() string {
