@@ -196,7 +196,7 @@ export default function PostDetailPage() {
   const isOwner = user && author && author.id === user.id
   const PAGE_SIZE = 20
   const commentConfig: CommentSectionConfig = {
-    queryKey: 'post-comments',
+    queryKey: ['post-comments', postId],
     fetchComments: (page, sort) => communityApi.getComments(postId, page, PAGE_SIZE, sort),
     createComment: (content, replyToId) => communityApi.createComment(postId, { content, parent_id: replyToId ?? 0 }),
     likeComment: (id) => communityApi.likeComment(postId, id),

@@ -10,7 +10,7 @@ import { toast } from '@/stores/toastStore'
 type CommentSort = 'latest' | 'hot'
 
 export interface CommentSectionConfig {
-  queryKey: string
+  queryKey: string[]
   fetchComments: (page: number, sort: CommentSort) => Promise<{ list: any[]; pages: number; page: number }>
   createComment: (content: string, replyToId?: number) => Promise<any>
   likeComment: (commentId: number) => Promise<any>
@@ -34,7 +34,7 @@ export function CommentSection({ config, currentUser }: CommentSectionProps) {
   const PAGE_SIZE = 20
 
   const commentsQuery = useQuery({
-    queryKey: [config.queryKey, sort, commentPage],
+    queryKey: [...config.queryKey, sort, commentPage],
     queryFn: () => config.fetchComments(commentPage, sort),
   })
 
@@ -43,7 +43,7 @@ export function CommentSection({ config, currentUser }: CommentSectionProps) {
       await config.createComment(payload.content, payload.replyToId)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [config.queryKey] })
+      queryClient.invalidateQueries({ queryKey: config.queryKey })
       setCommentText('')
       setReplyTo(null)
       toast.success('评论发布成功')
@@ -56,19 +56,19 @@ export function CommentSection({ config, currentUser }: CommentSectionProps) {
       if (isLiked) await config.unlikeComment(commentId)
       else await config.likeComment(commentId)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [config.queryKey] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: config.queryKey }),
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (commentId: number) => { await config.deleteComment(commentId) },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [config.queryKey] }); toast.success('评论已删除') },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: config.queryKey }); toast.success('评论已删除') },
   })
 
   const editMutation = useMutation({
     mutationFn: async ({ commentId, content }: { commentId: number; content: string }) => {
       if (config.updateComment) await config.updateComment(commentId, content)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [config.queryKey] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: config.queryKey }),
   })
 
   const comments: CommentItemData[] = (commentsQuery.data?.list ?? []).map(

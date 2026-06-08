@@ -198,7 +198,7 @@ export default function DevLogDetailPage() {
   const isDraft = log.status === 'draft'
   const PAGE_SIZE = 20
   const commentConfig: CommentSectionConfig = {
-    queryKey: 'log-comments',
+    queryKey: ['log-comments', logId],
     fetchComments: (page, sort) => logApi.listComments(logId, page, PAGE_SIZE, sort),
     createComment: (content, replyToId) => logApi.createComment(logId, { content, reply_to_id: replyToId ?? 0 }),
     likeComment: (id) => logApi.likeComment(logId, id),
