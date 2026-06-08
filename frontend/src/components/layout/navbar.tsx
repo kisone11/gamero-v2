@@ -9,6 +9,7 @@ import { useNotifStore } from '@/stores/notifStore'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { notificationApi } from '@/api/notification'
 import { timeAgo } from '@/lib/time'
+import { getAccessTokenRole, isAdminRole } from '@/lib/auth-role'
 import { useState, useRef, useEffect } from 'react'
 import type { Notification } from '@/types/api'
 
@@ -91,7 +92,7 @@ export function Navbar() {
   })
 
   const count = wsUnread > 0 ? wsUnread : ((unreadCount as any)?.unread_count ?? 0)
-  const canAccessAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+  const canAccessAdmin = isAdminRole(getAccessTokenRole())
 
   const { data: dropdownData } = useQuery({
     queryKey: ['notifications-dropdown'],
@@ -122,7 +123,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 h-16 bg-surface-deep/85 backdrop-blur-2xl border-b border-white/[0.04]">
       <div className="h-full max-w-[1280px] mx-auto px-6 flex items-center">
         {/* Logo */}
-        <Link to="/feed" className="flex items-center gap-2.5 mr-8 shrink-0 group">
+        <Link to="/feed" className="flex items-center gap-2.5 mr-4 shrink-0 group md:mr-8">
           <div className="w-8 h-8 rounded-md bg-gradient-to-br from-amber to-amber-dim flex items-center justify-center shadow-[0_0_12px_rgba(245,166,35,0.2)]">
             <Gamepad2 className="w-4 h-4 text-surface-void" />
           </div>
@@ -132,7 +133,7 @@ export function Navbar() {
         </Link>
 
         {/* Nav Links */}
-        <nav className="flex items-center h-full">
+        <nav className="hidden items-center h-full md:flex">
           {NAV_LINKS.map(link => (
             <Link
               key={link.href}
@@ -178,7 +179,7 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          <Link to="/projects/new">
+          <Link to="/projects/new" className="hidden sm:block">
             <Button variant="primary" size="sm">
               <Plus className="w-3.5 h-3.5" />
               创建

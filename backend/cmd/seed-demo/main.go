@@ -117,7 +117,7 @@ func seedUsers(tx *gorm.DB) (map[string]*model.User, error) {
 	demos := []demoUser{
 		{
 			Username: "demo_pixel_alchemist", Nickname: "像素炼金师", Email: "demo-pixel@gamero.local",
-			Bio: "独立游戏程序兼像素美术，喜欢做有物理反馈的小世界。", Role: model.UserRoleCreator, Location: "广东 深圳", Coop: "online",
+			Bio: "独立游戏程序兼像素美术，喜欢做有物理反馈的小世界。", Role: model.UserRoleSuperAdmin, Location: "广东 深圳", Coop: "online",
 			Skills: []model.UserSkill{{Category: model.SkillCategoryProgram, Name: "Godot", Level: model.SkillLevelAdvanced, Description: "熟悉 2D 工具链与编辑器扩展"}, {Category: model.SkillCategoryArt, Name: "像素风", Level: model.SkillLevelAdvanced, Description: "角色动画、瓦片地图、UI 图标"}},
 		},
 		{

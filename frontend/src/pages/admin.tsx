@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, Pencil, Trash2, AlertTriangle, Hash, ShieldCheck,
+  Plus, Pencil, Trash2, AlertTriangle, Hash, ShieldCheck, Gauge, Shield,
 } from 'lucide-react'
 import { communityApi } from '@/api/community'
 import { adminApi } from '@/api/admin'
@@ -318,31 +318,57 @@ export default function AdminPage() {
   const [tab, setTab] = useState('overview')
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
-      <h1 className="text-[22px] font-bold text-text-primary mb-6">管理后台</h1>
-      <Tabs
-        tabs={[
-          { value: 'overview', label: '概览' },
-          { value: 'reports', label: '举报管理' },
-          { value: 'users', label: '用户管理' },
-          { value: 'content', label: '内容管理' },
-          { value: 'topics', label: '话题管理' },
-          { value: 'sensitive', label: '敏感词' },
-          { value: 'announcements', label: '公告' },
-          { value: 'audit', label: '审计日志' },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-      <div className="mt-6">
-        {tab === 'overview' && <OverviewTab onOpenTab={setTab} />}
-        {tab === 'reports' && <ReportsTab />}
-        {tab === 'users' && <UsersTab />}
-        {tab === 'content' && <ContentTab />}
-        {tab === 'topics' && <TopicsTab />}
-        {tab === 'sensitive' && <SensitiveWordsTab />}
-        {tab === 'announcements' && <AnnouncementsTab />}
-        {tab === 'audit' && <AuditLogsTab />}
+    <div className="relative min-h-[calc(100dvh-4rem)]">
+      <div className="fixed inset-0 pointer-events-none bg-surface-void/70 backdrop-blur-[1px]" />
+      <div className="relative mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-mono text-text-muted">
+              <Shield className="h-3.5 w-3.5 text-amber" />
+              ADMIN WORKBENCH
+            </div>
+            <h1 className="text-[24px] font-bold leading-tight text-text-primary">管理后台</h1>
+            <p className="mt-1 max-w-2xl text-[13px] leading-6 text-text-secondary">
+              面向内容治理、用户复核、公告发布和运营审计的日常工作台。
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="flex h-10 items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 text-[12px] text-text-secondary">
+              <Gauge className="h-4 w-4 text-amber" />
+              运营监控
+            </div>
+            <div className="flex h-10 items-center gap-2 rounded-lg border border-success/20 bg-success/10 px-3 text-[12px] font-medium text-success">
+              <span className="h-2 w-2 rounded-full bg-success" />
+              权限已验证
+            </div>
+          </div>
+        </div>
+
+        <Tabs
+          className="sticky top-16 z-30 -mx-4 overflow-x-auto bg-surface-void/80 px-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+          tabs={[
+            { value: 'overview', label: '概览' },
+            { value: 'reports', label: '举报管理' },
+            { value: 'users', label: '用户管理' },
+            { value: 'content', label: '内容管理' },
+            { value: 'topics', label: '话题管理' },
+            { value: 'sensitive', label: '敏感词' },
+            { value: 'announcements', label: '公告' },
+            { value: 'audit', label: '审计日志' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+        <div className="mt-6">
+          {tab === 'overview' && <OverviewTab onOpenTab={setTab} />}
+          {tab === 'reports' && <ReportsTab />}
+          {tab === 'users' && <UsersTab />}
+          {tab === 'content' && <ContentTab />}
+          {tab === 'topics' && <TopicsTab />}
+          {tab === 'sensitive' && <SensitiveWordsTab />}
+          {tab === 'announcements' && <AnnouncementsTab />}
+          {tab === 'audit' && <AuditLogsTab />}
+        </div>
       </div>
     </div>
   )

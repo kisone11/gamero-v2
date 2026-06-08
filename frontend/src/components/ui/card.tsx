@@ -15,7 +15,7 @@ export function Card({ children, className, hover = true, padding = 'md', overfl
   return (
     <div
       className={cn(
-        'bg-surface-card backdrop-blur-sm border border-white/[0.04] rounded-xl',
+        'bg-surface-card backdrop-blur-sm border border-white/[0.04] rounded-lg',
         paddings[padding],
         overflow && 'overflow-hidden',
         group && 'group',

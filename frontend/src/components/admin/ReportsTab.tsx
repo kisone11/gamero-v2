@@ -5,12 +5,12 @@ import { Flag, CheckCircle, XCircle, Ban, ChevronDown, ChevronRight, ExternalLin
 import { adminApi } from '@/api/admin'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Pagination } from '@/components/ui/pagination'
 import { timeAgo } from '@/lib/time'
 import { toast } from '@/stores/toastStore'
 import { ReportSkeleton } from './AdminSkeletons'
+import { AdminFilterGroup, AdminListHeader, AdminListPanel, AdminListRow, AdminToolbar } from './AdminList'
 import type { Report } from '@/types/api'
 
 const TARGET_TYPE_LABELS: Record<string, string> = {
@@ -129,22 +129,13 @@ export function ReportsTab() {
 
   return (
     <div>
-      {/* Status filter tabs */}
-      <div className="flex items-center gap-1 mb-4">
-        {REPORT_STATUS_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => { setStatusFilter(f.value); setPage(1); setExpandedId(null) }}
-            className={`px-3 py-1.5 text-small font-medium rounded-lg transition-colors ${
-              statusFilter === f.value
-                ? 'bg-white/[0.06] text-text-primary'
-                : 'text-text-muted hover:text-text-secondary hover:bg-white/[0.03]'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <AdminToolbar title="举报管理" description="按状态筛选举报队列，展开行后处理、驳回或执行封禁。">
+        <AdminFilterGroup
+          options={REPORT_STATUS_FILTERS}
+          value={statusFilter}
+          onChange={(next) => { setStatusFilter(next); setPage(1); setExpandedId(null) }}
+        />
+      </AdminToolbar>
 
       {/* Loading */}
       {isLoading && (
@@ -179,56 +170,39 @@ export function ReportsTab() {
       {/* List */}
       {!isLoading && !isError && reports.length > 0 && (
         <>
-          <div className="space-y-2">
+          <AdminListPanel>
+            <AdminListHeader columns={['举报', '对象', '处理']} />
             {reports.map((report: Report) => {
               const statusCfg = REPORT_STATUS_CONFIG[report.status] ?? { label: report.status, variant: 'default' as const }
               const isExpanded = expandedId === report.id
               const currentNote = noteInputs[report.id] ?? ''
 
               return (
-                <Card key={report.id} padding="md" hover={false}>
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0 mt-0.5">
-                      <Flag className="w-4 h-4 text-coral" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {/* Header row */}
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                <AdminListRow key={report.id}>
+                  <div className="grid gap-4 lg:grid-cols-[1fr_170px_180px] lg:items-start">
+                    <div className="min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <div className="mr-1 flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04]">
+                          <Flag className="h-4 w-4 text-amber" />
+                        </div>
                         <Badge variant={statusCfg.variant} size="sm">{statusCfg.label}</Badge>
-                        <Badge variant="default" size="sm">
-                          {TARGET_TYPE_LABELS[report.target_type] ?? report.target_type}
-                        </Badge>
                         <span className="text-caption text-text-muted font-mono">
                           #{report.id}
                         </span>
-                        <button
-                          onClick={() => toggleExpand(report.id)}
-                          className="ml-auto flex items-center gap-1 text-caption text-text-muted hover:text-text-secondary transition-colors"
-                        >
-                          {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                          {isExpanded ? '收起' : '详情'}
-                        </button>
                       </div>
 
-                      {/* View content link */}
-                      <ViewContentLink report={report} />
-
-                      {/* Reason */}
-                      <p className="text-body text-text-primary mb-1 line-clamp-2">
+                      <p className="mb-1 line-clamp-2 text-[14px] font-semibold text-text-primary">
                         {report.reason}
                       </p>
 
-                      {/* Suppliment (always shown if not expanded, truncated) */}
                       {report.supplement && !isExpanded && (
                         <p className="text-small text-text-muted mb-1 italic line-clamp-1">
                           补充说明: {report.supplement}
                         </p>
                       )}
 
-                      {/* Meta info */}
-                      <div className="flex items-center gap-3 text-caption text-text-muted">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-muted">
                         <span>举报者 ID: {report.reporter_id}</span>
-                        <span>目标 ID: {report.target_id}</span>
                         <span>{timeAgo(report.created_at)}</span>
                       </div>
 
@@ -246,10 +220,8 @@ export function ReportsTab() {
                         </p>
                       )}
 
-                      {/* ========== Expanded section ========== */}
                       {isExpanded && (
                         <div className="mt-3 pt-3 border-t border-white/[0.04] space-y-3">
-                          {/* Full supplement */}
                           {report.supplement && (
                             <div>
                               <p className="text-caption text-text-muted mb-1 font-medium">补充说明</p>
@@ -259,7 +231,6 @@ export function ReportsTab() {
                             </div>
                           )}
 
-                          {/* Full note display */}
                           {report.note && (
                             <div>
                               <p className="text-caption text-text-muted mb-1 font-medium">处理备注</p>
@@ -269,7 +240,6 @@ export function ReportsTab() {
                             </div>
                           )}
 
-                          {/* Action note textarea + buttons */}
                           {report.status === 'pending' && (
                             <div className="space-y-3">
                               <textarea
@@ -279,7 +249,7 @@ export function ReportsTab() {
                                 rows={2}
                                 className="w-full px-3 py-2 bg-surface-void border border-white/[0.06] rounded-lg text-body text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:border-amber/40"
                               />
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 {getActions(report).map((act) => (
                                   <Button
                                     key={act.action}
@@ -298,11 +268,29 @@ export function ReportsTab() {
                         </div>
                       )}
                     </div>
+                    <div className="space-y-1 text-[12px] text-text-muted">
+                      <Badge variant="default" size="sm">{TARGET_TYPE_LABELS[report.target_type] ?? report.target_type}</Badge>
+                      <p className="font-mono">目标 ID: {report.target_id}</p>
+                      <ViewContentLink report={report} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      {report.status === 'pending' ? (
+                        <Button variant="secondary" size="sm" onClick={() => toggleExpand(report.id)}>
+                          {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          处理
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" onClick={() => toggleExpand(report.id)}>
+                          {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          {isExpanded ? '收起' : '详情'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </Card>
+                </AdminListRow>
               )
             })}
-          </div>
+          </AdminListPanel>
           <Pagination page={page} pages={pages} onChange={setPage} />
         </>
       )}

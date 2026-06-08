@@ -2,15 +2,19 @@ import { Navigate } from 'react-router-dom'
 import { Shield } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
+import { getAccessTokenRole, isAdminRole } from '@/lib/auth-role'
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, logout } = useAuthStore()
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />
   }
 
-  if (user.role !== 'admin' && user.role !== 'superadmin') {
+  const tokenRole = getAccessTokenRole()
+  const canAccessAdmin = isAdminRole(tokenRole)
+
+  if (!canAccessAdmin) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-6">
         <div className="max-w-md text-center bg-surface-card border border-white/[0.04] rounded-2xl p-8">
@@ -21,7 +25,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
           <p className="text-[14px] text-text-secondary mb-6 leading-relaxed">
             当前账号不是管理员。请使用 admin 或 superadmin 账号登录。
           </p>
-          <Button onClick={() => window.location.assign('/feed')}>返回首页</Button>
+          <Button onClick={() => { logout(); window.location.assign('/login') }}>重新登录管理员账号</Button>
         </div>
       </div>
     )

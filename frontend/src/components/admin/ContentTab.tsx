@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, FileText } from 'lucide-react'
+import { AlertTriangle, FileText, Search } from 'lucide-react'
 import { adminApi } from '@/api/admin'
 import { communityApi } from '@/api/community'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Pagination } from '@/components/ui/pagination'
 import { Input } from '@/components/ui/input'
 import { timeAgo } from '@/lib/time'
 import { toast } from '@/stores/toastStore'
 import { LogSkeleton } from './AdminSkeletons'
+import { AdminListHeader, AdminListPanel, AdminListRow, AdminToolbar } from './AdminList'
 
 export function ContentTab() {
   const queryClient = useQueryClient()
@@ -61,19 +61,21 @@ export function ContentTab() {
 
   return (
     <div>
-      {/* Header */}
-      <h3 className="text-h3 text-text-primary mb-4">帖子管理</h3>
-      {/* Search */}
-      <div className="flex gap-2 mb-4">
-        <Input
-          placeholder="搜索帖子标题..."
-          value={searchInput}
-          onChange={e => setSearchInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          fullWidth
-        />
-        <Button variant="secondary" size="sm" onClick={handleSearch}>搜索</Button>
-      </div>
+      <AdminToolbar title="帖子管理" description="按标题检索社区内容，快速打开、隐藏或删除异常帖子。">
+        <div className="flex w-full items-center gap-2 sm:w-[360px]">
+          <Input
+            placeholder="搜索帖子标题..."
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            fullWidth
+          />
+          <Button variant="secondary" size="sm" onClick={handleSearch}>
+            <Search className="h-3.5 w-3.5" />
+            搜索
+          </Button>
+        </div>
+      </AdminToolbar>
 
       {/* Loading */}
       {isLoading && (
@@ -86,7 +88,7 @@ export function ContentTab() {
       {isError && !isLoading && (
         <div className="py-20 flex flex-col items-center justify-center text-center">
           <AlertTriangle className="w-7 h-7 text-text-muted mb-3" />
-          <p className="text-body text-text-muted mb-4">加载失败</p>
+          <p className="text-body text-text-muted mb-4">无法加载内容列表</p>
           <Button variant="secondary" size="sm" onClick={() => refetch()}>重新加载</Button>
         </div>
       )}
@@ -98,22 +100,28 @@ export function ContentTab() {
 
       {/* List */}
       {!isLoading && !isError && items.length > 0 && (
-        <div className="space-y-3">
+        <AdminListPanel>
+          <AdminListHeader columns={['帖子', '数据', '操作']} />
           {items.map((item: any) => (
-            <Card key={item.id} padding="md">
-              <div className="flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <Link to={`/post/${item.id}`} target="_blank" className="text-h4 text-text-primary truncate hover:text-amber transition-colors block">{item.title}</Link>
-                  <p className="text-caption text-text-muted font-mono mt-0.5">ID: {item.id} · Author: {item.author_id} · {timeAgo(item.created_at)}</p>
+            <AdminListRow key={item.id}>
+              <div className="grid gap-4 lg:grid-cols-[1fr_170px_180px] lg:items-center">
+                <div className="min-w-0">
+                  <Link to={`/post/${item.id}`} target="_blank" className="block truncate text-[14px] font-semibold text-text-primary transition-colors hover:text-amber">{item.title}</Link>
+                  <p className="mt-1 line-clamp-1 text-[12px] text-text-muted">{item.content_snippet || item.content}</p>
+                  <p className="mt-1 text-[11px] text-text-muted font-mono">ID: {item.id} · Author: {item.author_id} · {timeAgo(item.created_at)}</p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted lg:block lg:space-y-1">
+                  <p>浏览 {item.view_count ?? 0}</p>
+                  <p>互动 {(item.like_count ?? 0) + (item.comment_count ?? 0) + (item.collect_count ?? 0)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   <Button variant="outline" size="sm" onClick={() => hidePostMut.mutate(item.id)} loading={hidePostMut.isPending}>隐藏</Button>
-                  <Button variant="ghost" size="sm" onClick={() => deletePostMut.mutate(item.id)} loading={deletePostMut.isPending}>删除</Button>
+                  <Button variant="danger" size="sm" onClick={() => deletePostMut.mutate(item.id)} loading={deletePostMut.isPending}>删除</Button>
                 </div>
               </div>
-            </Card>
+            </AdminListRow>
           ))}
-        </div>
+        </AdminListPanel>
       )}
 
       <Pagination page={page} pages={pages} onChange={setPage} />

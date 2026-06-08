@@ -21,7 +21,7 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
           key={tab.value}
           onClick={() => onChange(tab.value)}
           className={cn(
-            'relative px-4 py-3 text-[13px] font-medium transition-colors',
+            'relative shrink-0 px-4 py-3 text-[13px] font-medium whitespace-nowrap transition-colors',
             value === tab.value
               ? 'text-text-primary'
               : 'text-text-muted hover:text-text-secondary'

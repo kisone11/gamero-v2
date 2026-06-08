@@ -5,7 +5,6 @@ import { Search, Shield, Ban, CheckCircle, Users, AlertTriangle } from 'lucide-r
 import { adminApi } from '@/api/admin'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Pagination } from '@/components/ui/pagination'
 import { Input } from '@/components/ui/input'
@@ -13,6 +12,7 @@ import { formatDate } from '@/lib/time'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { toast } from '@/stores/toastStore'
 import { UserSkeleton } from './AdminSkeletons'
+import { AdminListHeader, AdminListPanel, AdminListRow, AdminToolbar } from './AdminList'
 import type { UserRole } from '@/types/enums'
 import type { UserProfileResponse } from '@/types/api'
 
@@ -115,21 +115,20 @@ export function UsersTab() {
 
   return (
     <div>
-      {/* Search */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex-1 max-w-sm">
+      <AdminToolbar title="用户管理" description="检索用户、调整角色和处理封禁状态。">
+        <div className="flex w-full items-center gap-2 sm:w-[360px]">
           <Input
             placeholder="搜索用户名或昵称..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-        </div>
-        <Button variant="secondary" size="sm" onClick={handleSearch}>
-          <Search className="h-4 w-4" />
+          <Button variant="secondary" size="sm" onClick={handleSearch}>
+          <Search className="h-3.5 w-3.5" />
           搜索
-        </Button>
-      </div>
+          </Button>
+        </div>
+      </AdminToolbar>
 
       {/* Loading */}
       {isLoading && (
@@ -164,12 +163,13 @@ export function UsersTab() {
       {/* List */}
       {!isLoading && !isError && users.length > 0 && (
         <>
-          <div className="space-y-2">
+          <AdminListPanel>
+            <AdminListHeader columns={['用户', '权限', '操作']} />
             {users.map((user: UserProfileResponse) => (
-              <Card key={user.id} padding="md" hover={false}>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0 overflow-hidden">
+              <AdminListRow key={user.id}>
+                <div className="grid gap-4 lg:grid-cols-[1fr_170px_180px] lg:items-center">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.04]">
                       {user.avatar_url ? (
                         <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -177,18 +177,15 @@ export function UsersTab() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Link to={`/u/${user.username || user.id}`} className="text-h4 text-text-primary truncate hover:text-amber transition-colors" target="_blank">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Link to={`/u/${user.username || user.id}`} className="min-w-0 max-w-full truncate text-h4 text-text-primary transition-colors hover:text-amber" target="_blank">
                           {user.nickname || user.username}
                         </Link>
-                        <Badge variant={USER_ROLE_VARIANTS[user.role ?? 'user']} size="sm">
-                          {USER_ROLE_LABELS[user.role ?? 'user']}
-                        </Badge>
                         {user.is_banned && (
                           <Badge variant="danger" size="sm">已封禁</Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-caption text-text-muted mt-0.5">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-muted">
                         <span>@{user.username}</span>
                         <span>ID: {user.id}</span>
                         <span>注册于 {formatDate(user.created_at)}</span>
@@ -196,19 +193,22 @@ export function UsersTab() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Role selector */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={USER_ROLE_VARIANTS[user.role ?? 'user']} size="sm">
+                      {USER_ROLE_LABELS[user.role ?? 'user']}
+                    </Badge>
                     <select
                       value={user.role ?? 'user'}
                       onChange={(e) => handleRoleChange(user, e.target.value)}
-                      className="h-8 px-2 text-small bg-surface-void text-text-secondary border border-white/[0.06] rounded-lg outline-none focus:border-amber/40 cursor-pointer"
+                      className="h-8 min-w-[128px] rounded-lg border border-white/[0.06] bg-surface-void px-2 text-small text-text-secondary outline-none focus:border-amber/40"
                     >
                       {MANAGEABLE_ROLES.map((r) => (
                         <option key={r.value} value={r.value}>{r.label}</option>
                       ))}
                     </select>
+                  </div>
 
-                    {/* Ban / Unban */}
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     {user.is_banned ? (
                       <Button
                         variant="secondary"
@@ -232,9 +232,9 @@ export function UsersTab() {
                     )}
                   </div>
                 </div>
-              </Card>
+              </AdminListRow>
             ))}
-          </div>
+          </AdminListPanel>
           <Pagination page={page} pages={pages} onChange={setPage} />
         </>
       )}

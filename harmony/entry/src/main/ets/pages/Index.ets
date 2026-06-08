@@ -103,9 +103,15 @@ struct Index {
   @State adminTargetIdText: string = '';
   @State sensitiveWords: string[] = [];
   @State sensitiveWordInput: string = '';
+  @State homeLoadedOnce: boolean = false;
 
   aboutToAppear(): void {
     this.errorText = '';
+    if (this.currentUser) {
+      this.refreshHomeData(false);
+    } else {
+      this.loadPublicData();
+    }
   }
 
   async loadPublicData(): Promise<void> {
@@ -325,7 +331,20 @@ struct Index {
   }
 
   async openFeature(view: string): Promise<void> {
+    if (view === 'home') {
+      await this.selectTab(0);
+      return;
+    }
+    if (view === 'projects') {
+      await this.selectTab(1);
+      return;
+    }
+    if (view === 'recruit') {
+      await this.selectTab(2);
+      return;
+    }
     this.featureView = view;
+    this.currentTab = 3;
     this.errorText = '';
     this.successText = '';
     if (view === 'posts') {
@@ -347,6 +366,32 @@ struct Index {
       await this.loadMyContent();
     } else if (view === 'collections') {
       await this.loadCollections();
+    }
+  }
+
+  async selectTab(index: number): Promise<void> {
+    this.currentTab = index;
+    this.errorText = '';
+    this.successText = '';
+    if (index === 0 && this.currentUser) {
+      await this.refreshHomeData(false);
+    } else if (index === 1) {
+      await this.loadPublicData();
+    } else if (index === 2) {
+      await this.loadPublicData();
+      await this.loadMyApplications();
+    } else if (index === 3) {
+      if (this.featureView === 'posts') {
+        await this.loadPosts();
+      } else if (this.featureView === 'logs') {
+        await this.loadDevLogs();
+      } else if (this.featureView === 'notifications') {
+        await this.loadNotifications();
+      } else if (this.featureView === 'talents') {
+        await this.loadTalents();
+      }
+    } else if (index === 4 && this.currentUser) {
+      await this.loadMyProfile();
     }
   }
 
@@ -1547,6 +1592,15 @@ struct Index {
     }
   }
 
+  async loadUnreadCount(): Promise<void> {
+    try {
+      const count = await GameroApi.getUnreadCount();
+      this.unreadCount = count.unread_count;
+    } catch {
+      this.unreadCount = 0;
+    }
+  }
+
   async markNotificationRead(id: number): Promise<void> {
     this.isLoading = true;
     this.errorText = '';
@@ -1615,7 +1669,7 @@ struct Index {
       const auth = await GameroApi.login(this.loginEmail, this.loginPassword);
       this.currentUser = auth.user;
       this.successText = '登录成功，已连接真实后端。';
-      await this.loadProtectedDataAfterAuth();
+      await this.refreshHomeData(false);
       this.currentTab = 0;
     } catch {
       this.errorText = '登录或受保护数据加载失败。';
@@ -1659,7 +1713,7 @@ struct Index {
       );
       this.currentUser = auth.user;
       this.successText = '注册成功，已自动登录。';
-      await this.loadProtectedDataAfterAuth();
+      await this.refreshHomeData(false);
       this.currentTab = 0;
     } catch {
       this.errorText = '注册失败。';
@@ -1669,6 +1723,14 @@ struct Index {
   }
 
   async loadProtectedDataAfterAuth(): Promise<void> {
+    await this.refreshHomeData(false);
+  }
+
+  async refreshHomeData(showLoading: boolean = true): Promise<void> {
+    if (showLoading) {
+      this.isLoading = true;
+    }
+    this.errorText = '';
     await this.loadPublicData();
 
     try {
@@ -1713,6 +1775,11 @@ struct Index {
     } catch {}
 
     await this.loadMyApplications();
+    await this.loadUnreadCount();
+    this.homeLoadedOnce = true;
+    if (showLoading) {
+      this.isLoading = false;
+    }
   }
 
   logout(): void {
@@ -1824,25 +1891,61 @@ struct Index {
     return diff > 0 ? `${diff} 天` : '已过期';
   }
 
+  tabIcon(index: number): string {
+    switch (index) {
+      case 0: return '动';
+      case 1: return '项';
+      case 2: return '招';
+      case 3: return '能';
+      default: return '我';
+    }
+  }
+
+  statusColor(status: string): string {
+    switch (status) {
+      case 'developing': return GameroTheme.success;
+      case 'playable': return '#64B5D8';
+      case 'launched': return GameroTheme.amber;
+      case 'paused': return GameroTheme.warning;
+      case 'abandoned': return GameroTheme.danger;
+      default: return GameroTheme.textSecondary;
+    }
+  }
+
+  genreColor(genre: string): string {
+    switch (genre) {
+      case 'action': return GameroTheme.coral;
+      case 'rpg': return '#C4A4E8';
+      case 'strategy': return GameroTheme.success;
+      case 'simulator': return GameroTheme.warning;
+      case 'puzzle': return '#64B5D8';
+      case 'horror': return '#8B6B7A';
+      case 'platform': return '#F0B070';
+      default: return '#8888A0';
+    }
+  }
+
   @Builder
   LogoHeader() {
     Row() {
       Stack() {
-        Rect().width(34).height(34).fill(GameroTheme.amber).radius(10)
-        Text('G').fontColor(GameroTheme.voidBg).fontSize(20).fontWeight(FontWeight.Bold)
-      }.width(38).height(38)
+        Rect().width(36).height(36).fill(GameroTheme.amber).radius(8)
+        Text('G').fontColor('#16161D').fontSize(20).fontWeight(FontWeight.Bold)
+      }.width(40).height(40)
 
       Column() {
-        Text('GAMERO').fontColor(GameroTheme.textPrimary).fontSize(20).fontWeight(FontWeight.Bold)
-        Text('游戏共创社区').fontColor(GameroTheme.textMuted).fontSize(11)
+        Text('GAMERO').fontColor(GameroTheme.textPrimary).fontSize(19).fontWeight(FontWeight.Bold)
+        Text(this.currentUser ? '游戏共创社区' : 'HarmonyOS 原生端').fontColor(GameroTheme.textMuted).fontSize(11)
       }.alignItems(HorizontalAlign.Start).margin({ left: 10 })
 
       Blank()
-      Text(this.currentUser ? this.currentUser.role || 'user' : 'Harmony').fontColor(GameroTheme.amber).fontSize(12).padding({ left: 10, right: 10, top: 6, bottom: 6 })
-        .backgroundColor('#241A0B').borderRadius(12)
+      Text(this.currentUser ? this.currentUser.role || 'user' : 'Harmony').fontColor(GameroTheme.amber).fontSize(11).fontWeight(FontWeight.Bold).padding({ left: 10, right: 10, top: 6, bottom: 6 })
+        .backgroundColor('#2C2418').borderRadius(8)
     }
     .width('100%')
-    .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+    .padding({ left: 18, right: 18, top: 14, bottom: 12 })
+    .backgroundColor('#F21A1A22')
+    .border({ width: { bottom: 1 }, color: GameroTheme.borderSubtle })
   }
 
   @Builder
@@ -1851,21 +1954,34 @@ struct Index {
       Text(value).fontColor(GameroTheme.textPrimary).fontSize(18).fontWeight(FontWeight.Bold)
       Text(label).fontColor(GameroTheme.textMuted).fontSize(11).margin({ top: 3 })
     }
-    .padding(12)
+    .padding({ top: 12, bottom: 12 })
     .layoutWeight(1)
-    .backgroundColor(GameroTheme.card)
-    .borderRadius(16)
-    .border({ width: 1, color: '#22FFFFFF' })
+    .backgroundColor('#2226313A')
+    .borderRadius(8)
+    .border({ width: 1, color: GameroTheme.borderSubtle })
   }
 
   @Builder
   Hero() {
     Column() {
+      Row() {
+        Text('LIVE STUDIO')
+          .fontColor(GameroTheme.amber)
+          .fontSize(10)
+          .fontWeight(FontWeight.Bold)
+          .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+          .backgroundColor('#2C2418')
+          .borderRadius(6)
+        Blank()
+        Text(this.currentUser ? this.currentUser.nickname || this.currentUser.username : '未登录')
+          .fontColor(GameroTheme.textSecondary)
+          .fontSize(11)
+      }.width('100%').margin({ bottom: 14 })
       Text('从灵感到组队上线')
         .fontColor(GameroTheme.textPrimary)
-        .fontSize(28)
+        .fontSize(27)
         .fontWeight(FontWeight.Bold)
-        .lineHeight(36)
+        .lineHeight(34)
       Text('项目展示、开发日志、社区交流、人才招募、任务看板与后台治理一体化。')
         .fontColor(GameroTheme.textSecondary)
         .fontSize(14)
@@ -1876,23 +1992,33 @@ struct Index {
         this.StatPill('动态', `${this.feeds.length}`)
         this.StatPill('招募', `${this.recruits.length}`)
       }.width('100%').margin({ top: 18 })
+      Button(this.homeLoadedOnce ? '刷新首页数据' : '加载首页数据')
+        .width('100%')
+        .height(40)
+        .fontColor('#16161D')
+        .fontSize(13)
+        .fontWeight(FontWeight.Bold)
+        .backgroundColor(GameroTheme.amber)
+        .borderRadius(8)
+        .margin({ top: 14 })
+        .onClick(() => this.refreshHomeData(true))
       if (this.errorText.length > 0) {
         Text(this.errorText).fontColor(GameroTheme.coral).fontSize(11).lineHeight(16).margin({ top: 12 })
       }
     }
     .width('100%')
     .padding(18)
-    .backgroundColor('#121721')
-    .borderRadius(22)
-    .border({ width: 1, color: '#1AFFFFFF' })
+    .backgroundColor('#23232D')
+    .borderRadius(8)
+    .border({ width: 1, color: GameroTheme.borderVisible })
   }
 
   @Builder
   FeedCard(item: FeedCardModel) {
     Column() {
       Row() {
-        Text(item.author.slice(0, 1)).fontColor(GameroTheme.voidBg).fontSize(14).fontWeight(FontWeight.Bold)
-          .width(34).height(34).textAlign(TextAlign.Center).backgroundColor(GameroTheme.amber).borderRadius(10)
+        Text(item.author.slice(0, 1)).fontColor('#16161D').fontSize(14).fontWeight(FontWeight.Bold)
+          .width(34).height(34).textAlign(TextAlign.Center).backgroundColor(GameroTheme.amber).borderRadius(8)
         Column() {
           Text(item.title).fontColor(GameroTheme.textPrimary).fontSize(15).fontWeight(FontWeight.Bold)
           Text(item.meta).fontColor(GameroTheme.textMuted).fontSize(11).margin({ top: 3 })
@@ -1922,19 +2048,144 @@ struct Index {
   ProjectItemCard(item: ProjectItem) {
     Column() {
       Row() {
+        Rect().width(4).height(42).fill(this.genreColor(item.genre)).radius(2).margin({ right: 10 })
         Column() {
           Text(item.name).fontColor(GameroTheme.textPrimary).fontSize(16).fontWeight(FontWeight.Bold)
           Text(`${this.genreText(item.genre)} · ${item.member_count || 0} 成员`).fontColor(GameroTheme.textMuted).fontSize(11).margin({ top: 4 })
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-        Text(this.statusText(item.status)).fontColor(GameroTheme.amber).fontSize(11).padding({ left: 9, right: 9, top: 5, bottom: 5 })
-          .backgroundColor('#241A0B').borderRadius(10)
+        Text(this.statusText(item.status)).fontColor(this.statusColor(item.status)).fontSize(11).fontWeight(FontWeight.Bold).padding({ left: 9, right: 9, top: 5, bottom: 5 })
+          .backgroundColor('#262A34').borderRadius(6)
       }
       Text(item.description || '暂无项目简介').fontColor(GameroTheme.textSecondary).fontSize(13).lineHeight(20).margin({ top: 12 })
-      Text(`${item.follower_count || 0} 关注 · ${item.view_count || 0} 浏览 · ${item.collect_count || 0} 收藏`)
-        .fontColor(GameroTheme.textMuted)
-        .fontSize(11)
-        .margin({ top: 12 })
+      Row({ space: 8 }) {
+        this.MiniMetric('关注', `${item.follower_count || 0}`)
+        this.MiniMetric('浏览', `${item.view_count || 0}`)
+        this.MiniMetric('收藏', `${item.collect_count || 0}`)
+      }.width('100%').margin({ top: 12 })
     }.cardStyle().onClick(() => this.openProjectDetail(item.id))
+  }
+
+  @Builder
+  MiniMetric(label: string, value: string) {
+    Text(`${value} ${label}`)
+      .fontColor(GameroTheme.textMuted)
+      .fontSize(11)
+      .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+      .backgroundColor('#20202A')
+      .borderRadius(6)
+  }
+
+  @Builder
+  SectionHeader(title: string, action: string, view: string) {
+    Row() {
+      Text(title).fontColor(GameroTheme.textPrimary).fontSize(18).fontWeight(FontWeight.Bold)
+      Blank()
+      Text(action)
+        .fontColor(GameroTheme.amber)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .padding({ left: 9, right: 9, top: 6, bottom: 6 })
+        .backgroundColor('#2C2418')
+        .borderRadius(6)
+        .onClick(() => this.openFeature(view))
+    }.width('100%').margin({ top: 16, bottom: 10 })
+  }
+
+  @Builder
+  QuickAction(title: string, desc: string, view: string) {
+    Column() {
+      Text(title).fontColor(GameroTheme.textPrimary).fontSize(14).fontWeight(FontWeight.Bold)
+      Text(desc).fontColor(GameroTheme.textMuted).fontSize(11).lineHeight(15).margin({ top: 5 })
+    }
+    .layoutWeight(1)
+    .height(74)
+    .padding(10)
+    .alignItems(HorizontalAlign.Start)
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor('#20202A')
+    .borderRadius(8)
+    .border({ width: 1, color: GameroTheme.borderSubtle })
+    .onClick(() => this.openFeature(view))
+  }
+
+  @Builder
+  QuickWorkspace() {
+    Column() {
+      Row() {
+        Text('快捷工作区').fontColor(GameroTheme.textPrimary).fontSize(16).fontWeight(FontWeight.Bold)
+        Blank()
+        Text(`${this.unreadCount} 未读`).fontColor(this.unreadCount > 0 ? GameroTheme.amber : GameroTheme.textMuted).fontSize(11)
+      }.width('100%').margin({ bottom: 10 })
+      Row({ space: 8 }) {
+        this.QuickAction('社区', '帖子与评论', 'posts')
+        this.QuickAction('日志', '开发进展', 'logs')
+      }.width('100%')
+      Row({ space: 8 }) {
+        this.QuickAction('搜索', '跨内容发现', 'search')
+        this.QuickAction('人才', '找协作者', 'talents')
+      }.width('100%').margin({ top: 8 })
+      Row({ space: 8 }) {
+        this.QuickAction('通知', '消息中心', 'notifications')
+        this.QuickAction('收藏', '我的沉淀', 'collections')
+      }.width('100%').margin({ top: 8 })
+    }.cardStyle()
+  }
+
+  @Builder
+  HomeProjectPreview() {
+    Column() {
+      Row() {
+        Text('最近项目').fontColor(GameroTheme.textPrimary).fontSize(16).fontWeight(FontWeight.Bold)
+        Blank()
+        Text('全部项目').fontColor(GameroTheme.amber).fontSize(11).fontWeight(FontWeight.Bold).onClick(() => this.selectTab(1))
+      }.width('100%').margin({ bottom: 10 })
+      if (this.projectItems.length > 0) {
+        ForEach(this.projectItems.slice(0, 3), (item: ProjectItem) => {
+          Row() {
+            Rect().width(4).height(34).fill(this.genreColor(item.genre)).radius(2).margin({ right: 10 })
+            Column() {
+              Text(item.name).fontColor(GameroTheme.textPrimary).fontSize(14).fontWeight(FontWeight.Bold)
+              Text(`${this.genreText(item.genre)} · ${this.statusText(item.status)} · ${item.follower_count || 0} 关注`).fontColor(GameroTheme.textMuted).fontSize(11).margin({ top: 4 })
+            }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+            Text('详情').fontColor(GameroTheme.amber).fontSize(11)
+          }
+          .width('100%')
+          .padding({ top: 10, bottom: 10 })
+          .border({ width: { bottom: 1 }, color: GameroTheme.borderSubtle })
+          .onClick(() => this.openProjectDetail(item.id))
+        })
+      } else {
+        Text('暂无项目数据').fontColor(GameroTheme.textMuted).fontSize(12)
+      }
+    }.cardStyle()
+  }
+
+  @Builder
+  HomeRecruitPreview() {
+    Column() {
+      Row() {
+        Text('正在招募').fontColor(GameroTheme.textPrimary).fontSize(16).fontWeight(FontWeight.Bold)
+        Blank()
+        Text('全部招募').fontColor(GameroTheme.amber).fontSize(11).fontWeight(FontWeight.Bold).onClick(() => this.selectTab(2))
+      }.width('100%').margin({ bottom: 10 })
+      if (this.recruitItems.length > 0) {
+        ForEach(this.recruitItems.slice(0, 3), (item: RecruitItem) => {
+          Row() {
+            Column() {
+              Text(item.project_name || `项目 #${item.project_id}`).fontColor(GameroTheme.textPrimary).fontSize(14).fontWeight(FontWeight.Bold)
+              Text(`${this.positionText(item.position)} · ${this.coopText(item.cooperation_type)} · ${this.daysLeft(item.expire_at)}`).fontColor(GameroTheme.textMuted).fontSize(11).margin({ top: 4 })
+            }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+            Text(item.status === 'closed' ? '已关闭' : '申请').fontColor(item.status === 'closed' ? GameroTheme.textMuted : '#16161D').fontSize(11).fontWeight(FontWeight.Bold).padding({ left: 9, right: 9, top: 5, bottom: 5 }).backgroundColor(item.status === 'closed' ? '#262A34' : GameroTheme.amber).borderRadius(6)
+          }
+          .width('100%')
+          .padding({ top: 10, bottom: 10 })
+          .border({ width: { bottom: 1 }, color: GameroTheme.borderSubtle })
+          .onClick(() => this.openRecruitDetail(item.id))
+        })
+      } else {
+        Text('暂无招募数据').fontColor(GameroTheme.textMuted).fontSize(12)
+      }
+    }.cardStyle()
   }
 
   @Builder
@@ -2298,13 +2549,17 @@ struct Index {
   RecruitItemCard(item: RecruitItem) {
     Column() {
       Row() {
+        Stack() {
+          Rect().width(38).height(38).fill('#2C2418').radius(8)
+          Text(this.positionText(item.position).slice(0, 1)).fontColor(GameroTheme.amber).fontSize(15).fontWeight(FontWeight.Bold)
+        }.width(42).height(42).margin({ right: 10 })
         Column() {
           Text(item.project_name || `项目 #${item.project_id}`).fontColor(GameroTheme.textPrimary).fontSize(15).fontWeight(FontWeight.Bold)
           Text(this.positionText(item.position)).fontColor(GameroTheme.amber).fontSize(13).margin({ top: 5 })
           Text(`${this.coopText(item.cooperation_type)} · ${item.headcount} 人 · ${this.daysLeft(item.expire_at)}`).fontColor(GameroTheme.textMuted).fontSize(11).margin({ top: 6 })
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-        Text(item.status || 'open').fontColor(GameroTheme.voidBg).fontSize(11).fontWeight(FontWeight.Bold).padding({ left: 12, right: 12, top: 7, bottom: 7 })
-          .backgroundColor(GameroTheme.amber).borderRadius(14)
+        Text(item.status === 'closed' ? '已关闭' : '招募中').fontColor(item.status === 'closed' ? GameroTheme.textMuted : '#16161D').fontSize(11).fontWeight(FontWeight.Bold).padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .backgroundColor(item.status === 'closed' ? '#262A34' : GameroTheme.amber).borderRadius(6)
       }
       Text(item.description || '暂无岗位说明').fontColor(GameroTheme.textSecondary).fontSize(12).lineHeight(18).margin({ top: 10 })
     }.cardStyle().onClick(() => this.openRecruitDetail(item.id))
@@ -2755,13 +3010,13 @@ struct Index {
   @Builder
   MessagePanel() {
     if (this.successText.length > 0) {
-      Text(this.successText).fontColor(GameroTheme.success).fontSize(12).lineHeight(18).margin({ bottom: 10 })
+      Text(this.successText).fontColor(GameroTheme.success).fontSize(12).lineHeight(18).padding(10).backgroundColor('#14281D').borderRadius(8).margin({ bottom: 10 })
     }
     if (this.errorText.length > 0) {
-      Text(this.errorText).fontColor(GameroTheme.coral).fontSize(12).lineHeight(18).margin({ bottom: 10 })
+      Text(this.errorText).fontColor(GameroTheme.coral).fontSize(12).lineHeight(18).padding(10).backgroundColor('#2A1718').borderRadius(8).margin({ bottom: 10 })
     }
     if (this.isLoading) {
-      Text('正在连接真实后端...').fontColor(GameroTheme.textMuted).fontSize(12).margin({ bottom: 10 })
+      Text('正在连接真实后端...').fontColor(GameroTheme.textSecondary).fontSize(12).padding(10).backgroundColor('#20202A').borderRadius(8).margin({ bottom: 10 })
     }
   }
 
@@ -3752,16 +4007,16 @@ struct Index {
             .fontSize(13)
             .lineHeight(20)
             .margin({ bottom: 14 })
-          this.FeatureCard('动态流 / Feed', '对应 /feed，登录后从真实后端拉取动态流。', '已接真实接口', 'menu')
+          this.FeatureCard('动态流 / Feed', '对应 /feed，登录后从真实后端拉取动态流。', '已接真实接口', 'home')
           this.FeatureCard('社区帖子', '对应 /community，已接帖子列表真实接口。', '已接真实接口', 'posts')
-          this.FeatureCard('项目发现', '对应 /projects、/p/:slug，项目列表已接真实接口。', '已接真实接口', 'menu')
-          this.FeatureCard('项目创建/编辑', '对应 /projects/new、/p/:slug/edit，移动端需补表单、封面、截图、视频上传。', '待补表单', 'menu')
-          this.FeatureCard('项目成员', '对应 /project/:id/members，已接添加、改角色、移除、退出。', '已接真实接口', 'menu')
-          this.FeatureCard('项目版本', '对应 /project/:id/releases，已接版本发布和版本记录。', '已接真实接口', 'menu')
-          this.FeatureCard('项目任务看板', '对应 /projects/:id/tasks，已接任务列表真实接口。', '已接真实接口', 'menu')
+          this.FeatureCard('项目发现', '对应 /projects、/p/:slug，项目列表已接真实接口。', '已接真实接口', 'projects')
+          this.FeatureCard('项目创建/编辑', '对应 /projects/new、/p/:slug/edit，移动端已接创建、编辑、封面、截图、视频上传。', '已接真实接口', 'projects')
+          this.FeatureCard('项目成员', '对应 /project/:id/members，已接添加、改角色、移除、退出。', '已接真实接口', 'projects')
+          this.FeatureCard('项目版本', '对应 /project/:id/releases，已接版本发布和版本记录。', '已接真实接口', 'projects')
+          this.FeatureCard('项目任务看板', '对应 /projects/:id/tasks，已接任务列表真实接口。', '已接真实接口', 'projects')
           this.FeatureCard('开发日志', '对应 /devlogs，已接开发日志列表和发布接口。', '已接真实接口', 'logs')
-          this.FeatureCard('招募协作', '对应 /recruit、/recruit/:id，招募列表已接真实接口。', '已接真实接口', 'menu')
-          this.FeatureCard('招募申请/编辑', '对应 /recruit/:id/edit、我的申请、我的邀请。', '待补详情/CRUD', 'menu')
+          this.FeatureCard('招募协作', '对应 /recruit、/recruit/:id，招募列表已接真实接口。', '已接真实接口', 'recruit')
+          this.FeatureCard('招募申请/编辑', '对应 /recruit/:id/edit、我的申请，已接详情、申请和 CRUD。', '已接真实接口', 'recruit')
           this.FeatureCard('人才市场', '对应 /talent，已接真实人才列表。', '已接真实接口', 'talents')
           this.FeatureCard('搜索发现', '对应 /search，已接真实搜索接口。', '已接真实接口', 'search')
           this.FeatureCard('通知中心', '对应 /notifications，已接通知列表和未读数接口。', '已接真实接口', 'notifications')
@@ -3783,7 +4038,10 @@ struct Index {
       Column() {
         this.Hero()
         this.MessagePanel()
-        Text('最新动态').sectionTitle()
+        this.QuickWorkspace()
+        this.HomeProjectPreview()
+        this.HomeRecruitPreview()
+        this.SectionHeader('最新动态', '查看社区', 'posts')
         if (this.feeds.length > 0) {
           ForEach(this.feeds, (item: FeedCardModel) => { this.FeedCard(item) })
         } else {
@@ -3870,20 +4128,28 @@ struct Index {
     }
     .width('100%')
     .padding({ left: 12, right: 12, top: 8, bottom: 10 })
-    .backgroundColor('#EE11151D')
-    .border({ width: { top: 1 }, color: '#1FFFFFFF' })
+    .backgroundColor('#F21F1F28')
+    .border({ width: { top: 1 }, color: GameroTheme.borderVisible })
   }
 
   @Builder
   NavItem(index: number, title: string) {
     Column() {
-      Circle().width(6).height(6).fill(this.currentTab === index ? GameroTheme.amber : '#00000000')
-      Text(title).fontColor(this.currentTab === index ? GameroTheme.amber : GameroTheme.textMuted).fontSize(12).margin({ top: 5 })
+      Text(this.tabIcon(index))
+        .fontColor(this.currentTab === index ? '#16161D' : GameroTheme.textMuted)
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .width(28)
+        .height(24)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(this.currentTab === index ? GameroTheme.amber : '#262A34')
+        .borderRadius(6)
+      Text(title).fontColor(this.currentTab === index ? GameroTheme.textPrimary : GameroTheme.textMuted).fontSize(11).margin({ top: 4 })
     }
     .layoutWeight(1)
-    .height(48)
+    .height(52)
     .justifyContent(FlexAlign.Center)
-    .onClick(() => this.currentTab = index)
+    .onClick(() => this.selectTab(index))
   }
 
   build() {
@@ -3929,21 +4195,21 @@ function cardStyle() {
   .width('100%')
   .padding(16)
   .backgroundColor(GameroTheme.card)
-  .borderRadius(18)
-  .border({ width: 1, color: '#18FFFFFF' })
+  .borderRadius(8)
+  .border({ width: 1, color: GameroTheme.borderSubtle })
   .margin({ bottom: 12 })
 }
 
 @Extend(Column)
 function pageContent() {
   .width('100%')
-  .padding({ left: 16, right: 16, bottom: 16 })
+  .padding({ left: 16, right: 16, top: 12, bottom: 16 })
 }
 
 @Extend(Text)
 function sectionTitle() {
   .fontColor(GameroTheme.textPrimary)
-  .fontSize(22)
+  .fontSize(21)
   .fontWeight(FontWeight.Bold)
-  .margin({ top: 8, bottom: 14 })
+  .margin({ top: 10, bottom: 12 })
 }

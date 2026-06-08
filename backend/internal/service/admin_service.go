@@ -732,28 +732,29 @@ func (s *adminService) GetDashboardOverview(ctx context.Context) (*AdminDashboar
 	}
 	auditLogs, _, err := s.adminRepo.ListAuditLogs(ctx, 0, 0, 8)
 	if err != nil {
-		return nil, apperrors.WrapMsg(apperrors.CodeInternalError, "查询审计日志失败", err)
+		logger.Warn("admin dashboard audit logs query failed", zap.Error(err))
+		auditLogs = []*model.AdminAuditLog{}
 	}
 
 	db := s.adminRepo.DB().WithContext(ctx)
 	var pendingReports, escalatedReports, bannedUsers, bannedProjects, openRecruitments, pendingApplications int64
 	if err := db.Model(&model.Report{}).Where("status = ?", "pending").Count(&pendingReports).Error; err != nil {
-		return nil, err
+		logger.Warn("admin dashboard metric query failed", zap.String("metric", "pending_reports"), zap.Error(err))
 	}
 	if err := db.Model(&model.Report{}).Where("status = ?", "escalated").Count(&escalatedReports).Error; err != nil {
-		return nil, err
+		logger.Warn("admin dashboard metric query failed", zap.String("metric", "escalated_reports"), zap.Error(err))
 	}
 	if err := db.Model(&model.User{}).Where("deleted_at IS NULL AND is_banned = ?", true).Count(&bannedUsers).Error; err != nil {
-		return nil, err
+		logger.Warn("admin dashboard metric query failed", zap.String("metric", "banned_users"), zap.Error(err))
 	}
 	if err := db.Model(&model.Project{}).Where("deleted_at IS NULL AND is_banned = ?", true).Count(&bannedProjects).Error; err != nil {
-		return nil, err
+		logger.Warn("admin dashboard metric query failed", zap.String("metric", "banned_projects"), zap.Error(err))
 	}
 	if err := db.Model(&model.Recruitment{}).Where("status = ? AND expire_at > ?", model.RecruitmentStatusOpen, time.Now()).Count(&openRecruitments).Error; err != nil {
-		return nil, err
+		logger.Warn("admin dashboard metric query failed", zap.String("metric", "open_recruitments"), zap.Error(err))
 	}
 	if err := db.Model(&model.RecruitmentApplication{}).Where("status = ?", model.ApplicationStatusPending).Count(&pendingApplications).Error; err != nil {
-		return nil, err
+		logger.Warn("admin dashboard metric query failed", zap.String("metric", "pending_applications"), zap.Error(err))
 	}
 
 	riskMetrics := []AdminDashboardMetric{
