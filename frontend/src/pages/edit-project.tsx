@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -40,6 +40,11 @@ const ENGINE_OPTIONS = [
 ]
 
 const PLATFORM_OPTIONS = ['PC', 'Mac', 'iOS', 'Android', 'Web', 'PS5', 'Xbox', 'Switch']
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  const data = err as { message?: string; response?: { data?: { message?: string; msg?: string } } }
+  return data.response?.data?.message || data.response?.data?.msg || data.message || fallback
+}
 
 // ============================================================
 // EditProjectPage
@@ -91,6 +96,19 @@ export default function EditProjectPage() {
 
   const project = projectQuery.data
 
+  const qaItemsQuery = useQuery({
+    queryKey: ['project-qa-items', project?.id],
+    queryFn: () => projectApi.listQAItems(project!.id),
+    enabled: !!project?.id,
+  })
+  const qaSummary = useMemo(() => {
+    const items = qaItemsQuery.data ?? []
+    const blockers = items.filter((item) => item.status === 'blocked' || item.status === 'failed').length
+    const passed = items.filter((item) => item.status === 'passed').length
+    return { total: items.length, blockers, passed, ready: items.length > 0 && blockers === 0 && passed === items.length }
+  }, [qaItemsQuery.data])
+  const canSelectLaunched = project?.status === 'launched' || qaSummary.ready
+
   useEffect(() => {
     if (!project || formInitialized) return
     reset({
@@ -128,13 +146,16 @@ export default function EditProjectPage() {
         name: data.name,
         description: data.description,
         genre: data.genre as ProjectGenre,
-        status: data.status as ProjectStatus,
         style_tags: styleTags.length > 0 ? styleTags : undefined,
         platform: platforms.length > 0 ? platforms : undefined,
         engine: data.engine || undefined,
         demo_url: data.demo_url || undefined,
         store_url: data.store_url || undefined,
       })
+
+      if (data.status !== project.status) {
+        await projectApi.updateStatus(project.id, { status: data.status as ProjectStatus })
+      }
 
       if (coverFile && project.id) {
         const coverKey = await uploadFile('cover', coverFile, project.id)
@@ -158,8 +179,8 @@ export default function EditProjectPage() {
       queryClient.invalidateQueries({ queryKey: ['project', slug] })
       navigate(`/p/${slug}`)
     },
-    onError: () => {
-      toast.error('更新项目失败，请重试')
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err, '更新项目失败，请重试'))
     },
   })
 
@@ -334,9 +355,17 @@ export default function EditProjectPage() {
               >
                 <option value="">请选择</option>
                 {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value} disabled={o.value === 'launched' && !canSelectLaunched}>{o.label}</option>
                 ))}
               </select>
+              <p className="text-[12px] text-text-muted">
+                选择“已上线”时会校验上线验收清单；所有验收项需全部通过，存在待验收、阻塞或未通过项时不能上线。
+              </p>
+              {!canSelectLaunched && (
+                <p className="text-[12px] text-danger">
+                  当前验收项通过 {qaSummary.passed}/{qaSummary.total}，阻塞/未通过 {qaSummary.blockers}，暂不能选择“已上线”。
+                </p>
+              )}
               {errors.status && <p className="text-[13px] text-danger">{errors.status.message}</p>}
             </div>
           </div>

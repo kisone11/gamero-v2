@@ -299,7 +299,7 @@ export default function ProjectDetailPage() {
             {tab === 'milestones' && <ProjectMilestonesTab projectId={project.id} isOwner={isOwner} />}
             {tab === 'resources' && <ProjectResourcesTab projectId={project.id} isOwner={isOwner} currentUserId={user?.id} />}
             {tab === 'risks' && <ProjectRiskRadarTab projectId={project.id} isOwner={isOwner} currentUserId={user?.id} />}
-            {tab === 'qa-gate' && <ProjectQAGateTab projectId={project.id} isOwner={isOwner} currentUserId={user?.id} />}
+            {tab === 'qa-gate' && <ProjectQAGateTab projectId={project.id} projectSlug={project.slug} isOwner={isOwner} currentUserId={user?.id} />}
             {tab === 'recruit' && <RecruitTab project={project} isOwner={isOwner} />}
             {tab === 'reviews' && (
               <ProjectReviewsTab

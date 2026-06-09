@@ -77,6 +77,7 @@ type UpdateProjectReq struct {
 	Name        *string  `json:"name"`
 	Description *string  `json:"description"`
 	Genre       *string  `json:"genre"`
+	Status      *string  `json:"status"`
 	StyleTags   []string `json:"style_tags"`
 	Visibility  *string  `json:"visibility"` // public / private
 	DemoURL     *string  `json:"demo_url"`
@@ -220,6 +221,13 @@ type ProjectQAItemDetail struct {
 	CheckedAt   *time.Time              `json:"checked_at,omitempty"`
 	CreatedAt   time.Time               `json:"created_at"`
 	UpdatedAt   time.Time               `json:"updated_at"`
+}
+
+type projectQAGateSummary struct {
+	RequiredTotal int
+	Passed        int
+	Pending       int
+	Blockers      int
 }
 
 // MemberDetail 成员详情（含用户基本信息）
@@ -899,6 +907,7 @@ func (s *projectService) UpdateProject(ctx context.Context, ownerID, projectID u
 
 	// 构建更新 map（只更新请求中携带的字段）
 	updates := make(map[string]interface{})
+	var statusUpdate *string
 
 	if req.Name != nil {
 		if len(*req.Name) == 0 || len(*req.Name) > 128 {
@@ -922,6 +931,21 @@ func (s *projectService) UpdateProject(ctx context.Context, ownerID, projectID u
 			return nil, apperrors.New(apperrors.CodeParamInvalid, "无效的游戏类型")
 		}
 		updates["genre"] = *req.Genre
+	}
+
+	if req.Status != nil {
+		status := strings.TrimSpace(*req.Status)
+		if !model.ValidProjectStatuses[model.ProjectStatus(status)] {
+			return nil, apperrors.New(apperrors.CodeParamInvalid, "无效的项目状态")
+		}
+		if model.ProjectStatus(status) != project.Status {
+			statusUpdate = &status
+		}
+	}
+	if statusUpdate != nil && model.ProjectStatus(*statusUpdate) == model.ProjectStatusLaunched {
+		if err := s.ensureProjectCanLaunch(ctx, projectID); err != nil {
+			return nil, err
+		}
 	}
 
 	if req.StyleTags != nil {
@@ -959,12 +983,18 @@ func (s *projectService) UpdateProject(ctx context.Context, ownerID, projectID u
 		updates["visibility"] = v
 	}
 
-	if len(updates) == 0 {
+	if len(updates) == 0 && statusUpdate == nil {
 		return project, nil
 	}
 
-	if err := s.repo.UpdateProject(ctx, projectID, updates); err != nil {
-		return nil, err
+	if len(updates) > 0 {
+		if err := s.repo.UpdateProject(ctx, projectID, updates); err != nil {
+			return nil, err
+		}
+	}
+
+	if statusUpdate != nil {
+		return s.UpdateStatus(ctx, ownerID, projectID, *statusUpdate)
 	}
 
 	// 重新查询返回最新数据
@@ -995,6 +1025,11 @@ func (s *projectService) UpdateStatus(ctx context.Context, ownerID, projectID ui
 	oldStatus := project.Status
 	if string(oldStatus) == newStatus {
 		return project, nil
+	}
+	if model.ProjectStatus(newStatus) == model.ProjectStatusLaunched {
+		if err := s.ensureProjectCanLaunch(ctx, projectID); err != nil {
+			return nil, err
+		}
 	}
 
 	// 更新状态
@@ -1054,6 +1089,69 @@ func (s *projectService) UpdateStatus(ctx context.Context, ownerID, projectID ui
 	go s.notifyFollowers(context.Background(), project.ID, notifyMsg)
 
 	return s.mustGetProject(ctx, projectID)
+}
+
+func (s *projectService) summarizeProjectQAGate(ctx context.Context, projectID uint64) (*projectQAGateSummary, error) {
+	items, err := s.repo.ListQAItems(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	summary := &projectQAGateSummary{}
+	for _, item := range items {
+		summary.RequiredTotal++
+		switch item.Status {
+		case model.ProjectQAStatusPassed:
+			summary.Passed++
+		case model.ProjectQAStatusFailed, model.ProjectQAStatusBlocked:
+			summary.Blockers++
+		default:
+			summary.Pending++
+		}
+	}
+	return summary, nil
+}
+
+func (s *projectService) ensureProjectCanLaunch(ctx context.Context, projectID uint64) error {
+	summary, err := s.summarizeProjectQAGate(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if summary.RequiredTotal == 0 {
+		return apperrors.New(apperrors.CodeParamInvalid, "项目至少需要 1 个验收项通过后才能上线")
+	}
+	if summary.Blockers > 0 {
+		return apperrors.Newf(apperrors.CodeParamInvalid, "项目验收仍有 %d 个阻塞项，不能上线", summary.Blockers)
+	}
+	if summary.Passed < summary.RequiredTotal {
+		return apperrors.Newf(apperrors.CodeParamInvalid, "项目验收项尚未全部通过（%d/%d），不能上线", summary.Passed, summary.RequiredTotal)
+	}
+	return nil
+}
+
+func (s *projectService) rollbackLaunchedProjectIfQANotReady(ctx context.Context, projectID uint64, summary *projectQAGateSummary) error {
+	if summary == nil || (summary.RequiredTotal > 0 && summary.Blockers == 0 && summary.Passed == summary.RequiredTotal) {
+		return nil
+	}
+	project, err := s.mustGetProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if project.Status != model.ProjectStatusLaunched {
+		return nil
+	}
+	if err := s.repo.UpdateProject(ctx, projectID, map[string]interface{}{"status": model.ProjectStatusDeveloping}); err != nil {
+		return err
+	}
+	s.writeTimelineEvent(
+		ctx,
+		projectID,
+		model.TimelineEventStatusChanged,
+		"项目状态回退：已上线 → 开发中",
+		fmt.Sprintf("上线后验收清单不再满足发布条件（验收项通过 %d/%d，阻塞/未通过 %d，待验收 %d），项目状态自动回退为开发中", summary.Passed, summary.RequiredTotal, summary.Blockers, summary.Pending),
+		map[string]interface{}{"old_status": string(model.ProjectStatusLaunched), "new_status": string(model.ProjectStatusDeveloping), "qa_total": summary.RequiredTotal, "qa_passed": summary.Passed, "qa_blockers": summary.Blockers, "qa_pending": summary.Pending},
+	)
+	go s.notifyFollowers(context.Background(), projectID, fmt.Sprintf("项目「%s」因上线验收未满足发布条件，状态回退为「开发中」", project.Name))
+	return nil
 }
 
 // DeleteProject 软删除项目（仅 owner）
@@ -2215,6 +2313,11 @@ func (s *projectService) CreateQAItem(ctx context.Context, userID, projectID uin
 	if err != nil {
 		return nil, err
 	}
+	if summary, err := s.summarizeProjectQAGate(ctx, projectID); err != nil {
+		return nil, err
+	} else if err := s.rollbackLaunchedProjectIfQANotReady(ctx, projectID, summary); err != nil {
+		return nil, err
+	}
 	return qaItemDetail(item), nil
 }
 
@@ -2244,6 +2347,11 @@ func (s *projectService) UpdateQAItem(ctx context.Context, userID, projectID, it
 	if err != nil {
 		return nil, err
 	}
+	if summary, err := s.summarizeProjectQAGate(ctx, projectID); err != nil {
+		return nil, err
+	} else if err := s.rollbackLaunchedProjectIfQANotReady(ctx, projectID, summary); err != nil {
+		return nil, err
+	}
 	return qaItemDetail(item), nil
 }
 
@@ -2262,7 +2370,15 @@ func (s *projectService) DeleteQAItem(ctx context.Context, userID, projectID, it
 	if !isOwner && item.CreatorID != userID {
 		return apperrors.CodeError(apperrors.CodeProjectForbidden)
 	}
-	return s.repo.DeleteQAItem(ctx, projectID, itemID)
+	if err := s.repo.DeleteQAItem(ctx, projectID, itemID); err != nil {
+		return err
+	}
+	if summary, err := s.summarizeProjectQAGate(ctx, projectID); err != nil {
+		return err
+	} else if err := s.rollbackLaunchedProjectIfQANotReady(ctx, projectID, summary); err != nil {
+		return err
+	}
+	return nil
 }
 
 // indexProject 异步将项目写入 ES 索引（失败不影响主流程）

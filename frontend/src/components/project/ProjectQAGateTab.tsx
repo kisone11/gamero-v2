@@ -24,7 +24,7 @@ function getLoadErrorMessage(error: unknown) {
   return err?.message || err?.msg || '验收清单加载失败，请稍后重试'
 }
 
-export function ProjectQAGateTab({ projectId, isOwner, currentUserId }: { projectId: number; isOwner: boolean; currentUserId?: number }) {
+export function ProjectQAGateTab({ projectId, projectSlug, isOwner, currentUserId }: { projectId: number; projectSlug: string; isOwner: boolean; currentUserId?: number }) {
   const queryClient = useQueryClient()
   const queryKey = ['project-qa-items', projectId]
   const [editingItem, setEditingItem] = useState<(ProjectQAItemReq & { id?: number }) | null>(null)
@@ -33,21 +33,26 @@ export function ProjectQAGateTab({ projectId, isOwner, currentUserId }: { projec
   const itemsQuery = useQuery({ queryKey, queryFn: () => projectApi.listQAItems(projectId) })
   const items = itemsQuery.data ?? []
   const summary = useMemo(() => {
-    const required = items.filter(i => i.is_required)
-    const blockers = required.filter(i => i.status === 'blocked' || i.status === 'failed').length
-    const passed = required.filter(i => i.status === 'passed').length
-    return { total: required.length, passed, blockers, ready: required.length > 0 && blockers === 0 && passed === required.length }
+    const blockers = items.filter(i => i.status === 'blocked' || i.status === 'failed').length
+    const passed = items.filter(i => i.status === 'passed').length
+    return { total: items.length, passed, blockers, ready: items.length > 0 && blockers === 0 && passed === items.length }
   }, [items])
+
+  const refreshProjectStatus = () => {
+    queryClient.invalidateQueries({ queryKey })
+    queryClient.invalidateQueries({ queryKey: ['project', projectSlug] })
+    queryClient.refetchQueries({ queryKey: ['project', projectSlug] })
+  }
 
   const saveMutation = useMutation({
     mutationFn: (item: ProjectQAItemReq & { id?: number }) => {
       const payload: ProjectQAItemReq = { title: item.title?.trim(), description: item.description?.trim(), evidence_url: item.evidence_url?.trim(), note: item.note?.trim(), category: item.category, status: item.status, is_required: !!item.is_required }
       return item.id ? projectApi.updateQAItem(projectId, item.id, payload) : projectApi.createQAItem(projectId, payload)
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey }); setEditingItem(null); toast.success('验收项已保存') },
+    onSuccess: () => { refreshProjectStatus(); setEditingItem(null); toast.success('验收项已保存') },
     onError: (e: any) => toast.error(e?.message || '验收项保存失败'),
   })
-  const deleteMutation = useMutation({ mutationFn: (itemId: number) => projectApi.deleteQAItem(projectId, itemId), onSuccess: () => { queryClient.invalidateQueries({ queryKey }); setDeleteTarget(null); toast.success('验收项已删除') }, onError: () => toast.error('删除失败') })
+  const deleteMutation = useMutation({ mutationFn: (itemId: number) => projectApi.deleteQAItem(projectId, itemId), onSuccess: () => { refreshProjectStatus(); setDeleteTarget(null); toast.success('验收项已删除') }, onError: () => toast.error('删除失败') })
 
   const saveItem = () => {
     if (!editingItem?.title?.trim()) { toast.error('请输入验收项标题'); return }
@@ -56,7 +61,7 @@ export function ProjectQAGateTab({ projectId, isOwner, currentUserId }: { projec
 
   return <div className="py-6 space-y-4">
     <div className="flex items-center justify-between"><div><h3 className="text-h3 text-text-primary">上线验收清单</h3><p className="text-[13px] text-text-muted mt-1">发布前检查玩法、美术、音频、性能、Bug、商店页和合规项</p></div><Button size="sm" onClick={() => setEditingItem({ ...emptyItem })}><Plus className="w-4 h-4" />新增验收项</Button></div>
-    <Card hover={false} padding="lg" className={summary.ready ? 'border-success/20 bg-success/[0.03]' : summary.blockers > 0 ? 'border-danger/20 bg-danger/[0.03]' : ''}><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3">{summary.ready ? <CheckCircle className="w-6 h-6 text-success" /> : summary.blockers > 0 ? <ShieldAlert className="w-6 h-6 text-danger" /> : <ClipboardCheck className="w-6 h-6 text-amber" />}<div><p className="text-[15px] font-semibold text-text-primary">{summary.ready ? '可以发布' : summary.blockers > 0 ? '存在阻塞项' : '等待验收'}</p><p className="text-[12px] text-text-muted">必选项通过 {summary.passed}/{summary.total}，阻塞 {summary.blockers}</p></div></div><Badge variant={summary.ready ? 'success' : summary.blockers > 0 ? 'danger' : 'warning'}>{summary.ready ? 'Ready' : summary.blockers > 0 ? 'Blocked' : 'Pending'}</Badge></div></Card>
+    <Card hover={false} padding="lg" className={summary.ready ? 'border-success/20 bg-success/[0.03]' : summary.blockers > 0 ? 'border-danger/20 bg-danger/[0.03]' : ''}><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3">{summary.ready ? <CheckCircle className="w-6 h-6 text-success" /> : summary.blockers > 0 ? <ShieldAlert className="w-6 h-6 text-danger" /> : <ClipboardCheck className="w-6 h-6 text-amber" />}<div><p className="text-[15px] font-semibold text-text-primary">{summary.ready ? '可以发布' : summary.blockers > 0 ? '存在阻塞项' : '等待验收'}</p><p className="text-[12px] text-text-muted">验收项通过 {summary.passed}/{summary.total}，阻塞/未通过 {summary.blockers}</p></div></div><Badge variant={summary.ready ? 'success' : summary.blockers > 0 ? 'danger' : 'warning'}>{summary.ready ? 'Ready' : summary.blockers > 0 ? 'Blocked' : 'Pending'}</Badge></div></Card>
     {itemsQuery.isLoading ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
     : itemsQuery.isError ? <Card hover={false}><p className="text-[13px] text-danger text-center py-8">{getLoadErrorMessage(itemsQuery.error)}</p></Card>
     : items.length === 0 ? <Card hover={false} className="py-14 text-center"><ClipboardCheck className="w-7 h-7 text-text-muted mx-auto mb-3" /><p className="text-[14px] font-semibold text-text-secondary mb-1">暂无验收项</p><p className="text-[12px] text-text-muted">可以先添加发布前必须通过的 QA 项</p></Card>
